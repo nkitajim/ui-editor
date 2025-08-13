@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Field, Theme } from '../types';
 import { createStyles } from '../styles';
+import { getDescriptionPreview } from '../utils/textParser';
 
 interface AdminModeProps {
   fields: Field[];
@@ -44,6 +45,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
 
   const updateLabel = (id: string, label: string) => {
     setFields(fields.map(f => f.id === id ? { ...f, label } : f));
+  };
+
+  const updateDescription = (id: string, description: string) => {
+    setFields(fields.map(f => f.id === id ? { ...f, description: description || undefined } : f));
   };
 
   const updateOptions = (id: string, options: string[]) => {
@@ -278,6 +283,37 @@ export const AdminMode: React.FC<AdminModeProps> = ({
               onFocus={() => setFocusedId(field.id + "-label")}
               onBlur={() => setFocusedId(null)}
             />
+            <textarea
+              value={field.description || ""}
+              onChange={(e) => updateDescription(field.id, e.target.value)}
+              placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+              style={{
+                ...styles.inputStyle,
+                ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                marginBottom: 8,
+                minHeight: 80,
+                resize: "vertical",
+                backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                color: theme.textColor,
+              }}
+              onFocus={() => setFocusedId(field.id + "-description")}
+              onBlur={() => setFocusedId(null)}
+            />
+            {field.description && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: theme.textColor === "#ddd" ? "#bbb" : "#666",
+                  marginBottom: 12,
+                  padding: 8,
+                  backgroundColor: theme.name === "ダーク" ? "#34495e" : "#f8f9fa",
+                  borderRadius: 4,
+                  border: `1px solid ${theme.primaryColor}33`,
+                }}
+              >
+                <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+              </div>
+            )}
 
             {/* デフォルト値と正規表現入力(テキストのみ) */}
             {field.type === "text" && (
@@ -329,24 +365,55 @@ export const AdminMode: React.FC<AdminModeProps> = ({
               </>
             )}
 
-            {/* ラジオボタン */}
-            {field.type === "radio" && (
-              <>
-                <input
-                  type="text"
-                  placeholder="デフォルト値（選択肢のいずれかを入力）"
-                  value={field.defaultValue || ""}
-                  onChange={(e) => updateDefaultValue(field.id, e.target.value)}
-                  style={{
-                    ...styles.inputStyle,
-                    ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                    marginBottom: 12,
-                    backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                    color: theme.textColor,
-                  }}
-                  onFocus={() => setFocusedId(field.id + "-default")}
-                  onBlur={() => setFocusedId(null)}
-                />
+                            {/* ラジオボタン */}
+                {field.type === "radio" && (
+                  <>
+                    <textarea
+                      value={field.description || ""}
+                      onChange={(e) => updateDescription(field.id, e.target.value)}
+                      placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 8,
+                        minHeight: 80,
+                        resize: "vertical",
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-description")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                    {field.description && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: theme.textColor === "#ddd" ? "#bbb" : "#666",
+                          marginBottom: 12,
+                          padding: 8,
+                          backgroundColor: theme.name === "ダーク" ? "#34495e" : "#f8f9fa",
+                          borderRadius: 4,
+                          border: `1px solid ${theme.primaryColor}33`,
+                        }}
+                      >
+                        <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      placeholder="デフォルト値（選択肢のいずれかを入力）"
+                      value={field.defaultValue || ""}
+                      onChange={(e) => updateDefaultValue(field.id, e.target.value)}
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-default")}
+                      onBlur={() => setFocusedId(null)}
+                    />
                 {field.options.map((opt, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
                     <input type="radio" disabled checked={field.defaultValue === opt} />
@@ -406,24 +473,55 @@ export const AdminMode: React.FC<AdminModeProps> = ({
               </>
             )}
 
-            {/* チェックボックス */}
-            {field.type === "checkbox" && (
-              <>
-                <input
-                  type="text"
-                  placeholder="デフォルト値（カンマ区切りで選択肢を入力）"
-                  value={Array.isArray(field.defaultValue) ? field.defaultValue.join(",") : ""}
-                  onChange={(e) => updateDefaultValue(field.id, e.target.value)}
-                  style={{
-                    ...styles.inputStyle,
-                    ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                    marginBottom: 12,
-                    backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                    color: theme.textColor,
-                  }}
-                  onFocus={() => setFocusedId(field.id + "-default")}
-                  onBlur={() => setFocusedId(null)}
-                />
+                            {/* チェックボックス */}
+                {field.type === "checkbox" && (
+                  <>
+                    <textarea
+                      value={field.description || ""}
+                      onChange={(e) => updateDescription(field.id, e.target.value)}
+                      placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 8,
+                        minHeight: 80,
+                        resize: "vertical",
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-description")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                    {field.description && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: theme.textColor === "#ddd" ? "#bbb" : "#666",
+                          marginBottom: 12,
+                          padding: 8,
+                          backgroundColor: theme.name === "ダーク" ? "#34495e" : "#f8f9fa",
+                          borderRadius: 4,
+                          border: `1px solid ${theme.primaryColor}33`,
+                        }}
+                      >
+                        <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      placeholder="デフォルト値（カンマ区切りで選択肢を入力）"
+                      value={Array.isArray(field.defaultValue) ? field.defaultValue.join(",") : ""}
+                      onChange={(e) => updateDefaultValue(field.id, e.target.value)}
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-default")}
+                      onBlur={() => setFocusedId(null)}
+                    />
                 <input
                   type="text"
                   placeholder="必須項目（カンマ区切りで選択肢を入力）"

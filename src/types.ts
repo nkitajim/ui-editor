@@ -1,7 +1,7 @@
 export type Field =
-  | { id: string; type: "text"; label: string; defaultValue?: string; validationRegex?: string }
-  | { id: string; type: "radio"; label: string; options: string[]; defaultValue?: string }
-  | { id: string; type: "checkbox"; label: string; options: string[]; defaultValue?: string[]; requiredOptions?: string[]; errorMessage?: string };
+  | { id: string; type: "text"; label: string; description?: string; defaultValue?: string; validationRegex?: string }
+  | { id: string; type: "radio"; label: string; description?: string; options: string[]; defaultValue?: string }
+  | { id: string; type: "checkbox"; label: string; description?: string; options: string[]; defaultValue?: string[]; requiredOptions?: string[]; errorMessage?: string };
 
 export type Mode = "admin" | "user";
 

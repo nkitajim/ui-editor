@@ -3,6 +3,7 @@ import { Field, Theme } from '../types';
 import { createStyles } from '../styles';
 import { apiService } from '../services/api';
 import { SubmissionsList } from './SubmissionsList';
+import { parseDescriptionWithLinks } from '../utils/textParser';
 
 interface UserModeProps {
   fields: Field[];
@@ -184,6 +185,17 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
             >
               {field.label}
             </label>
+            {field.description && (
+              <div
+                style={{
+                  fontSize: 14,
+                  color: theme.textColor === "#ddd" ? "#bbb" : "#666",
+                  marginBottom: 8,
+                  lineHeight: 1.4,
+                }}
+                dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
+              />
+            )}
             <div>
               {field.type === "text" && (
                 <>

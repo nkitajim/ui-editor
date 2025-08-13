@@ -14,12 +14,12 @@ const App: React.FC = () => {
   // fieldsが変更されたときにJSONを更新
   React.useEffect(() => {
     if (autoUpdateJson) {
-      const json = JSON.stringify(fields, null, 2);
+    const json = JSON.stringify(fields, null, 2);
       setJsonInput(json);
     }
   }, [fields, autoUpdateJson]);
 
-  return (
+   return (
     <div
       style={{
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen",
