@@ -24,6 +24,16 @@
         "選択肢1",
         "選択肢2"
       ]
+    },
+    {
+      "id": "1755078486792",
+      "type": "map",
+      "label": "マップ",
+      "defaultValue": {
+        "aaaa": "bbb"
+      },
+      "groupId": "g2",
+      "valueValidationRegex": "^[0-9]$"
     }
   ]
 }

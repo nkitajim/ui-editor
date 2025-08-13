@@ -30,9 +30,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
   autoUpdateJson,
   setAutoUpdateJson,
 }) => {
-  const [dragging, setDragging] = useState<"text" | "radio" | "checkbox" | null>(null);
+  const [dragging, setDragging] = useState<"text" | "radio" | "checkbox" | "map" | null>(null);
   const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [mapDefaultRows, setMapDefaultRows] = useState<Record<string, { key: string; value: string }[]>>({});
   const styles = createStyles(theme);
 
   // グループ操作
@@ -56,14 +57,16 @@ export const AdminMode: React.FC<AdminModeProps> = ({
   };
 
   // フィールド操作
-  const addField = (type: "text" | "radio" | "checkbox") => {
+  const addField = (type: "text" | "radio" | "checkbox" | "map") => {
     const id = Date.now().toString();
     if (type === "text") {
       setFields([...fields, { id, type, label: "テキスト" }]);
     } else if (type === "radio") {
       setFields([...fields, { id, type, label: "ラジオ", options: ["選択肢1", "選択肢2"] }]);
-    } else {
+    } else if (type === "checkbox") {
       setFields([...fields, { id, type, label: "チェック", options: ["項目1", "項目2"] }]);
+    } else {
+      setFields([...fields, { id, type, label: "マップ", defaultValue: {} } as any]);
     }
   };
 
@@ -81,10 +84,77 @@ export const AdminMode: React.FC<AdminModeProps> = ({
 
   const removeField = (id: string) => {
     setFields(fields.filter(f => f.id !== id));
+    setMapDefaultRows(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
-  const updateValidationRegex = (id: string, regex: string | undefined) => {
-    setFields(fields.map(f => f.id === id && f.type === "text" ? { ...f, validationRegex: regex } : f));
+  const updateTextValidationRegex = (id: string, regex: string | undefined) => {
+    setFields(fields.map(f => (f.id === id && f.type === "text") ? { ...f, validationRegex: regex } : f));
+  };
+
+  const updateMapValidationRegex = (id: string, kind: 'key' | 'value', regex: string | undefined) => {
+    setFields(fields.map(f => {
+      if (f.id === id && (f as any).type === 'map') {
+        if (kind === 'key') {
+          return { ...(f as any), keyValidationRegex: regex } as Field;
+        }
+        return { ...(f as any), valueValidationRegex: regex } as Field;
+      }
+      return f;
+    }));
+  };
+
+  // map デフォルト値 行編集
+  React.useEffect(() => {
+    setMapDefaultRows(prev => {
+      const next: Record<string, { key: string; value: string }[]> = { ...prev };
+      const mapFieldIds = new Set<string>();
+      for (const f of fields) {
+        if ((f as any).type === 'map') {
+          mapFieldIds.add(f.id);
+          if (!next[f.id]) {
+            const def = (f as any).defaultValue as Record<string, string> | undefined;
+            next[f.id] = def ? Object.entries(def).map(([k, v]) => ({ key: String(k), value: String(v) })) : [];
+          }
+        }
+      }
+      Object.keys(next).forEach(id => {
+        if (!mapFieldIds.has(id)) delete next[id];
+      });
+      return next;
+    });
+  }, [fields]);
+
+  const setMapRowsAndCommit = (fieldId: string, updater: (prev: { key: string; value: string }[]) => { key: string; value: string }[]) => {
+    setMapDefaultRows(prevAll => {
+      const nextRows = updater(prevAll[fieldId] || []);
+      // commit to fields.defaultValue
+      const obj: Record<string, string> = {};
+      for (const { key, value } of nextRows) {
+        if (key !== '') obj[key] = value;
+      }
+      setFields(current => current.map(f => (f.id === fieldId && (f as any).type === 'map') ? ({ ...(f as any), defaultValue: obj } as Field) : f));
+      return { ...prevAll, [fieldId]: nextRows };
+    });
+  };
+
+  const addMapRow = (fieldId: string) => {
+    setMapRowsAndCommit(fieldId, prev => [...prev, { key: '', value: '' }]);
+  };
+
+  const removeMapRow = (fieldId: string, index: number) => {
+    setMapRowsAndCommit(fieldId, prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateMapRowKey = (fieldId: string, index: number, key: string) => {
+    setMapRowsAndCommit(fieldId, prev => prev.map((e, i) => i === index ? { ...e, key } : e));
+  };
+
+  const updateMapRowValue = (fieldId: string, index: number, value: string) => {
+    setMapRowsAndCommit(fieldId, prev => prev.map((e, i) => i === index ? { ...e, value } : e));
   };
 
   const updateRequiredOptions = (id: string, requiredOptions: string[]) => {
@@ -105,6 +175,16 @@ export const AdminMode: React.FC<AdminModeProps> = ({
         } else if (f.type === "checkbox") {
           const values = defaultValue ? defaultValue.split(',').map(v => v.trim()).filter(v => v) : [];
           return { ...f, defaultValue: values.length > 0 ? values : undefined };
+        } else if ((f as any).type === "map") {
+          try {
+            const obj = defaultValue ? JSON.parse(defaultValue) : undefined;
+            if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+              return { ...(f as any), defaultValue: obj } as Field;
+            }
+            return { ...(f as any), defaultValue: undefined } as Field;
+          } catch {
+            return { ...(f as any), defaultValue: undefined } as Field;
+          }
         }
       }
       return f;
@@ -190,6 +270,14 @@ export const AdminMode: React.FC<AdminModeProps> = ({
           style={styles.paletteItemStyle}
         >
           チェックボックス
+        </div>
+        <div
+          draggable
+          onDragStart={() => setDragging("map")}
+          onDragEnd={() => setDragging(null)}
+          style={styles.paletteItemStyle}
+        >
+          マップ（キー/値）
         </div>
       </div>
 
@@ -378,27 +466,124 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                   onFocus={() => setFocusedId(field.id + "-default")}
                   onBlur={() => setFocusedId(null)}
                 />
+                  <input
+                    type="text"
+                    placeholder="正規表現 (例: ^[0-9]+$)"
+                    value={(field as any).validationRegex || ""}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      updateTextValidationRegex(field.id, val || undefined);
+                    }}
+                    style={{
+                      ...styles.inputStyle,
+                      ...(focusedId === field.id + "-regex" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                      backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                      color: theme.textColor,
+                    }}
+                    onFocus={() => setFocusedId(field.id + "-regex")}
+                    onBlur={() => setFocusedId(null)}
+                  />
                 <input
                   type="text"
-                  placeholder="正規表現 (例: ^[0-9]+$)"
-                  value={field.validationRegex || ""}
-                  onChange={(e) => {
-                    const val = e.target.value.trim();
-                    updateValidationRegex(field.id, val || undefined);
-                  }}
+                  placeholder={"テキスト入力欄（プレビュー）"}
+                  defaultValue={field.defaultValue as any}
+                  disabled
                   style={{
                     ...styles.inputStyle,
-                    ...(focusedId === field.id + "-regex" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                    backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                    color: theme.textColor,
+                    backgroundColor: theme.name === "ダーク" ? "#3a4a63" : "#dbe9ff",
+                    cursor: "not-allowed",
+                    color: theme.textColor === "#ddd" ? "#ccc" : "#555",
+                    marginTop: 8,
                   }}
-                  onFocus={() => setFocusedId(field.id + "-regex")}
-                  onBlur={() => setFocusedId(null)}
                 />
+              </>
+            )}
+            {field.type === 'map' && (
+              <>
+                {(mapDefaultRows[field.id] ?? []).map((row, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="キー"
+                      value={row.key}
+                      onChange={(e) => updateMapRowKey(field.id, idx, e.target.value)}
+                      style={{
+                        ...styles.inputStyle,
+                        flex: 1,
+                        backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                        color: theme.textColor,
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="値"
+                      value={row.value}
+                      onChange={(e) => updateMapRowValue(field.id, idx, e.target.value)}
+                      style={{
+                        ...styles.inputStyle,
+                        flex: 1,
+                        backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                        color: theme.textColor,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMapRow(field.id, idx)}
+                      style={{
+                        backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: 6,
+                        padding: '8px 10px', cursor: 'pointer', fontWeight: 600
+                      }}
+                      title="行を削除"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+                  <button type="button" onClick={() => addMapRow(field.id)} style={{ ...styles.buttonStyle }}>
+                    行を追加
+                  </button>
+                </div>
+                  <>
+                    <input
+                      type="text"
+                      placeholder="キーの正規表現 (例: ^[A-Za-z_][A-Za-z0-9_]*$)"
+                      value={(field as any).keyValidationRegex || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        updateMapValidationRegex(field.id, 'key', val || undefined);
+                      }}
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-keyregex" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-keyregex")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="値の正規表現 (例: ^[0-9]+$)"
+                      value={(field as any).valueValidationRegex || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        updateMapValidationRegex(field.id, 'value', val || undefined);
+                      }}
+                      style={{
+                        ...styles.inputStyle,
+                        ...(focusedId === field.id + "-valueregex" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-valueregex")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                  </>
                 <input
                   type="text"
-                  placeholder="テキスト入力欄（プレビュー）"
-                  defaultValue={field.defaultValue}
+                  placeholder={"マップ（プレビュー: JSON）"}
+                  defaultValue={JSON.stringify((field as any).defaultValue || {})}
                   disabled
                   style={{
                     ...styles.inputStyle,

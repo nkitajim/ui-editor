@@ -16,6 +16,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
   const [radioValues, setRadioValues] = useState<Record<string, string>>({});
+  const [mapValues, setMapValues] = useState<Record<string, { key: string; value: string }[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
@@ -29,17 +30,49 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
   // バリデーション関数
   const validateField = (fieldId: string, value: string): string | null => {
     const field = fields.find(f => f.id === fieldId);
-    if (!field || field.type !== "text" || !field.validationRegex) {
-      return null;
+    if (!field) return null;
+
+    // text の正規表現
+    if (field.type === 'text' && field.validationRegex) {
+      try {
+        const regex = new RegExp(field.validationRegex);
+        if (!regex.test(value)) {
+          return `入力値が正規表現 "${field.validationRegex}" にマッチしません`;
+        }
+      } catch {
+        return '正規表現が不正です';
+      }
     }
 
-    try {
-      const regex = new RegExp(field.validationRegex);
-      if (!regex.test(value)) {
-        return `入力値が正規表現 "${field.validationRegex}" にマッチしません`;
+    // map の正規表現（キー・値それぞれ）
+    if ((field as any).type === 'map') {
+      const raw = value || JSON.stringify((field as any).defaultValue || {});
+      let parsed: any = {};
+      try {
+        parsed = raw ? JSON.parse(raw) : {};
+      } catch {
+        return 'マップのJSON形式が不正です。';
       }
-    } catch (error) {
-      return "正規表現が不正です";
+      const keyRegexStr = (field as any).keyValidationRegex as string | undefined;
+      const valueRegexStr = (field as any).valueValidationRegex as string | undefined;
+      let keyRegex: RegExp | undefined;
+      let valueRegex: RegExp | undefined;
+      try {
+        if (keyRegexStr) keyRegex = new RegExp(keyRegexStr);
+        if (valueRegexStr) valueRegex = new RegExp(valueRegexStr);
+      } catch {
+        return 'マップの正規表現が不正です。';
+      }
+      if (keyRegex || valueRegex) {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (keyRegex && !keyRegex.test(String(k))) {
+            return `キー "${k}" が正規表現 "${keyRegexStr}" に一致しません`;
+          }
+          if (valueRegex && !valueRegex.test(String(v))) {
+            return `値 "${String(v)}" が正規表現 "${valueRegexStr}" に一致しません`;
+          }
+        }
+      }
     }
 
     return null;
@@ -69,6 +102,58 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
       ...prev,
       [fieldId]: error || ""
     }));
+  };
+
+  // mapフィールド: 行操作とバリデーション
+  const validateMapEntries = (fieldId: string, entries: { key: string; value: string }[]): string | null => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field || (field as any).type !== 'map') return null;
+    const keyRegexStr = (field as any).keyValidationRegex as string | undefined;
+    const valueRegexStr = (field as any).valueValidationRegex as string | undefined;
+    let keyRegex: RegExp | undefined;
+    let valueRegex: RegExp | undefined;
+    try {
+      if (keyRegexStr) keyRegex = new RegExp(keyRegexStr);
+      if (valueRegexStr) valueRegex = new RegExp(valueRegexStr);
+    } catch {
+      return 'マップの正規表現が不正です。';
+    }
+    if (keyRegex || valueRegex) {
+      for (const { key, value } of entries) {
+        if (keyRegex && !keyRegex.test(String(key))) {
+          return `キー "${key}" が正規表現 "${keyRegexStr}" に一致しません`;
+        }
+        if (valueRegex && !valueRegex.test(String(value))) {
+          return `値 "${String(value)}" が正規表現 "${valueRegexStr}" に一致しません`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const setMapAndValidate = (fieldId: string, updater: (prev: { key: string; value: string }[]) => { key: string; value: string }[]) => {
+    setMapValues(prevAll => {
+      const nextEntries = updater(prevAll[fieldId] || []);
+      const err = validateMapEntries(fieldId, nextEntries) || '';
+      setValidationErrors(prev => ({ ...prev, [fieldId]: err }));
+      return { ...prevAll, [fieldId]: nextEntries };
+    });
+  };
+
+  const addMapEntry = (fieldId: string) => {
+    setMapAndValidate(fieldId, (prev) => [...prev, { key: '', value: '' }]);
+  };
+
+  const removeMapEntry = (fieldId: string, index: number) => {
+    setMapAndValidate(fieldId, (prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateMapKey = (fieldId: string, index: number, key: string) => {
+    setMapAndValidate(fieldId, (prev) => prev.map((e, i) => i === index ? { ...e, key } : e));
+  };
+
+  const updateMapValue = (fieldId: string, index: number, value: string) => {
+    setMapAndValidate(fieldId, (prev) => prev.map((e, i) => i === index ? { ...e, value } : e));
   };
 
   const handleCheckboxChange = (fieldId: string, option: string, checked: boolean) => {
@@ -134,12 +219,27 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
     }
   }, [activeView]);
 
+  // 初期map値（defaultValue）をstateに注入（未設定の場合のみ）
+  React.useEffect(() => {
+    setMapValues(prev => {
+      const next: Record<string, { key: string; value: string }[]> = { ...prev };
+      for (const f of fields) {
+        if ((f as any).type === 'map' && !next[f.id]) {
+          const def = (f as any).defaultValue as Record<string, string> | undefined;
+          next[f.id] = def ? Object.entries(def).map(([k, v]) => ({ key: String(k), value: String(v) })) : [];
+        }
+      }
+      return next;
+    });
+  }, [fields]);
+
   // 一覧から選択されたデータをフォームに適用
   const handleSelectSubmission = (submission: { id: number; form_data: Record<string, any> }) => {
     const incoming = submission.form_data || {};
     const nextTextValues: Record<string, string> = {};
     const nextCheckboxValues: Record<string, string[]> = {};
     const nextRadioValues: Record<string, string> = {};
+    const nextMapValues: Record<string, { key: string; value: string }[]> = {};
 
     for (const field of fields) {
       const label = field.label;
@@ -150,12 +250,16 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
         nextRadioValues[field.id] = typeof value === 'string' ? value : (field.defaultValue || '');
       } else if (field.type === 'checkbox') {
         nextCheckboxValues[field.id] = Array.isArray(value) ? value : (Array.isArray(field.defaultValue) ? field.defaultValue : []);
+      } else if ((field as any).type === 'map') {
+        const obj = (value && typeof value === 'object') ? value as Record<string, any> : ((field as any).defaultValue || {});
+        nextMapValues[field.id] = Object.entries(obj).map(([k, v]) => ({ key: String(k), value: String(v) }));
       }
     }
 
     setFormValues(nextTextValues);
     setRadioValues(nextRadioValues);
     setCheckboxValues(nextCheckboxValues);
+    setMapValues(prev => ({ ...prev, ...nextMapValues }));
     setActiveView('form');
     // 編集IDを保持（送信時に更新APIを呼ぶため）
     setEditingId(submission.id);
@@ -238,6 +342,42 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
               if (field.type === "text") {
                 const val = formValues[field.id] || field.defaultValue || "";
                 output[field.label] = val;
+              } else if (field.type === "map") {
+                const entries = mapValues[field.id] ?? [];
+                // 正規表現チェック（キーと値）
+                const keyRegexStr = (field as any).keyValidationRegex as string | undefined;
+                const valueRegexStr = (field as any).valueValidationRegex as string | undefined;
+                let keyRegex: RegExp | undefined;
+                let valueRegex: RegExp | undefined;
+                try {
+                  if (keyRegexStr) keyRegex = new RegExp(keyRegexStr);
+                  if (valueRegexStr) valueRegex = new RegExp(valueRegexStr);
+                } catch {
+                  setSubmitMessage({ type: 'error', text: 'マップの正規表現が不正です。' });
+                  return;
+                }
+                if (keyRegex || valueRegex) {
+                  for (const { key, value } of entries) {
+                    if (keyRegex && !keyRegex.test(String(key))) {
+                      setSubmitMessage({ type: 'error', text: 'マップのキーが正規表現に一致しません。' });
+                      return;
+                    }
+                    if (valueRegex && !valueRegex.test(String(value))) {
+                      setSubmitMessage({ type: 'error', text: 'マップの値が正規表現に一致しません。' });
+                      return;
+                    }
+                  }
+                }
+                const obj: Record<string, string> = {};
+                for (const { key, value } of entries) {
+                  if (key !== '') obj[key] = value;
+                }
+                // 空の場合はdefaultValueを使う（行がない時）
+                if (Object.keys(obj).length === 0 && (field as any).defaultValue) {
+                  output[field.label] = (field as any).defaultValue;
+                } else {
+                  output[field.label] = obj;
+                }
               } else if (field.type === "radio") {
                 const selectedValue = radioValues[field.id] ?? field.defaultValue ?? "";
                 output[field.label] = selectedValue;
@@ -338,7 +478,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
                   <input
                     type="text"
                     name={field.id}
-                    value={formValues[field.id] || field.defaultValue || ""}
+                    value={formValues[field.id] || (field.defaultValue || "")}
                     onChange={(e) => handleInputChange(field.id, e.target.value)}
                     style={{
                       ...styles.inputStyle,
@@ -357,6 +497,67 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
                         fontSize: 12,
                         marginTop: 4,
                         fontWeight: "500",
+                      }}
+                    >
+                      {validationErrors[field.id]}
+                    </div>
+                  )}
+                </>
+              )}
+              {field.type === 'map' && (
+                <>
+                  {(mapValues[field.id] ?? []).map((entry, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="キー"
+                        value={entry.key}
+                        onChange={(e) => updateMapKey(field.id, idx, e.target.value)}
+                        style={{
+                          ...styles.inputStyle,
+                          flex: 1,
+                          backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                          color: theme.textColor,
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="値"
+                        value={entry.value}
+                        onChange={(e) => updateMapValue(field.id, idx, e.target.value)}
+                        style={{
+                          ...styles.inputStyle,
+                          flex: 1,
+                          backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                          color: theme.textColor,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeMapEntry(field.id, idx)}
+                        style={{
+                          backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: 6,
+                          padding: '8px 10px', cursor: 'pointer', fontWeight: 600
+                        }}
+                        title="行を削除"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => addMapEntry(field.id)}
+                      style={{ ...styles.buttonStyle }}
+                    >
+                      行を追加
+                    </button>
+                  </div>
+                  {validationErrors[field.id] && (
+                    <div
+                      style={{
+                        color: '#ff4d4f', fontSize: 12, marginTop: 4, fontWeight: '500'
                       }}
                     >
                       {validationErrors[field.id]}
@@ -490,7 +691,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
             error={submissionsError}
             onRefresh={loadSubmissions}
             onSelect={handleSelectSubmission}
-            onDelete={async (id) => {
+            onDelete={async (id: number) => {
               try {
                 await apiService.deleteSubmission(id);
                 loadSubmissions();

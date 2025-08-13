@@ -1,7 +1,8 @@
 export type Field =
   | { id: string; type: "text"; label: string; description?: string; groupId?: string; defaultValue?: string; validationRegex?: string }
   | { id: string; type: "radio"; label: string; description?: string; groupId?: string; options: string[]; defaultValue?: string }
-  | { id: string; type: "checkbox"; label: string; description?: string; groupId?: string; options: string[]; defaultValue?: string[]; requiredOptions?: string[]; errorMessage?: string };
+  | { id: string; type: "checkbox"; label: string; description?: string; groupId?: string; options: string[]; defaultValue?: string[]; requiredOptions?: string[]; errorMessage?: string }
+  | { id: string; type: "map"; label: string; description?: string; groupId?: string; defaultValue?: Record<string, string>; keyValidationRegex?: string; valueValidationRegex?: string };
 
 export type Group = {
   id: string;
