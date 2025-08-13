@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Field, Theme } from '../types';
 import { createStyles } from '../styles';
+import { apiService } from '../services/api';
+import { SubmissionsList } from './SubmissionsList';
 
 interface UserModeProps {
   fields: Field[];
@@ -11,6 +13,8 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const styles = createStyles(theme);
 
   // バリデーション関数
@@ -96,35 +100,61 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
     >
       <h3 style={{ color: theme.primaryColor, marginBottom: 20, textAlign: "center" }}>ユーザーモード（フォーム）</h3>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           
           // エラーがある場合は送信しない
           if (hasErrors()) {
-            alert("入力エラーがあります。修正してください。");
+            setSubmitMessage({ type: 'error', text: '入力エラーがあります。修正してください。' });
             return;
           }
 
-          const output: Record<string, any> = {};
+          setIsSubmitting(true);
+          setSubmitMessage(null);
 
-          for (const field of fields) {
-            if (field.type === "text") {
-              const val = formValues[field.id] || field.defaultValue || "";
-              output[field.label] = val;
-            } else if (field.type === "radio") {
-              const formData = new FormData(e.currentTarget);
-              const selectedValue = formData.get(field.id);
-              output[field.label] = selectedValue || field.defaultValue || "";
-            } else if (field.type === "checkbox") {
-              const values = checkboxValues[field.id] || [];
-              // 選択された値がない場合はデフォルト値を使用
-              output[field.label] = values.length > 0 ? values : (field.defaultValue as string[] || []);
+          try {
+            const output: Record<string, any> = {};
+
+            for (const field of fields) {
+              if (field.type === "text") {
+                const val = formValues[field.id] || field.defaultValue || "";
+                output[field.label] = val;
+              } else if (field.type === "radio") {
+                const formData = new FormData(e.currentTarget);
+                const selectedValue = formData.get(field.id);
+                output[field.label] = selectedValue || field.defaultValue || "";
+              } else if (field.type === "checkbox") {
+                const values = checkboxValues[field.id] || [];
+                // 選択された値がない場合はデフォルト値を使用
+                output[field.label] = values.length > 0 ? values : (field.defaultValue as string[] || []);
+              }
             }
-          }
 
-          const json = JSON.stringify(output, null, 2);
-          console.log(json);
-          alert("入力値のJSON:\n" + json);
+            // SQLiteにデータを保存
+            const result = await apiService.submitForm(output);
+            
+            setSubmitMessage({ 
+              type: 'success', 
+              text: `データが正常に保存されました。ID: ${result.id}` 
+            });
+
+            // フォームをリセット
+            setFormValues({});
+            setCheckboxValues({});
+            setValidationErrors({});
+
+            console.log('保存されたデータ:', output);
+            console.log('保存結果:', result);
+
+          } catch (error) {
+            console.error('送信エラー:', error);
+            setSubmitMessage({ 
+              type: 'error', 
+              text: 'データの保存に失敗しました。サーバーが起動しているか確認してください。' 
+            });
+          } finally {
+            setIsSubmitting(false);
+          }
         }}
       >
         {fields.map((field) => (
@@ -240,20 +270,38 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
             </div>
           </div>
         ))}
+        {submitMessage && (
+          <div
+            style={{
+              padding: 12,
+              marginBottom: 16,
+              borderRadius: 6,
+              backgroundColor: submitMessage.type === 'success' ? '#d4edda' : '#f8d7da',
+              color: submitMessage.type === 'success' ? '#155724' : '#721c24',
+              border: `1px solid ${submitMessage.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+              fontSize: 14,
+            }}
+          >
+            {submitMessage.text}
+          </div>
+        )}
+        
         <button
           type="submit"
-          disabled={hasErrors()}
+          disabled={hasErrors() || isSubmitting}
           style={{ 
-            ...(hasErrors() ? styles.buttonDisabledStyle : styles.buttonStyle), 
+            ...(hasErrors() || isSubmitting ? styles.buttonDisabledStyle : styles.buttonStyle), 
             width: "100%", 
             fontSize: 16, 
             padding: "12px 0",
-            backgroundColor: hasErrors() ? "#a3c0ff" : styles.buttonStyle.backgroundColor,
+            backgroundColor: hasErrors() || isSubmitting ? "#a3c0ff" : styles.buttonStyle.backgroundColor,
           }}
         >
-          {hasErrors() ? "エラーがあります" : "送信"}
+          {isSubmitting ? "送信中..." : hasErrors() ? "エラーがあります" : "送信"}
         </button>
       </form>
+      
+      <SubmissionsList theme={theme} />
     </div>
   );
 };

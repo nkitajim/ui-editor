@@ -1,46 +1,137 @@
-# Getting Started with Create React App
+# UI Editor with SQLite
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+フォームビルダーとSQLiteデータベースを組み合わせたWebアプリケーションです。
 
-## Available Scripts
+## 機能
 
-In the project directory, you can run:
+- **管理モード**: ドラッグ&ドロップでフォームを作成・編集
+- **ユーザーモード**: 作成したフォームに入力し、SQLiteに保存
+- **リアルタイムバリデーション**: 正規表現による入力検証
+- **テーマ切り替え**: ブルー、グリーン、ダークテーマ
+- **JSON入出力**: フォーム設定の保存・読み込み
 
-### `npm start`
+## セットアップ
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 1. フロントエンド（React）
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```bash
+# 依存関係をインストール
+npm install
 
-### `npm test`
+# 開発サーバーを起動
+npm start
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+フロントエンドは http://localhost:3000 で起動します。
 
-### `npm run build`
+### 2. バックエンド（Node.js + SQLite）
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+# バックエンドディレクトリに移動
+cd backend
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# 依存関係をインストール
+npm install
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# 開発サーバーを起動
+npm run dev
+```
 
-### `npm run eject`
+バックエンドは http://localhost:3001 で起動します。
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## 使用方法
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 管理モード
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+1. 管理モードでフォームを設計
+2. パレットからフィールドをドラッグ&ドロップ
+3. フィールドの設定（ラベル、デフォルト値、バリデーションなど）
+4. JSONで設定を保存・読み込み
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### ユーザーモード
 
-## Learn More
+1. ユーザーモードに切り替え
+2. フォームに入力
+3. 送信ボタンをクリックしてSQLiteに保存
+4. 保存されたデータを確認・削除
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## API エンドポイント
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- `POST /api/submit-form` - フォームデータを保存
+- `GET /api/submissions` - 保存されたデータを取得
+- `GET /api/submissions/:id` - 特定のデータを取得
+- `DELETE /api/submissions/:id` - データを削除
+
+## データベース
+
+SQLiteデータベース（`form_data.db`）が自動的に作成されます。
+
+### テーブル構造
+
+```sql
+CREATE TABLE form_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  form_data TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 技術スタック
+
+### フロントエンド
+- React 18
+- TypeScript
+- CSS-in-JS
+
+### バックエンド
+- Node.js
+- Express.js
+- SQLite3
+- CORS
+
+## 開発
+
+### ファイル構成
+
+```
+ui-editor/
+├── src/
+│   ├── components/
+│   │   ├── AdminMode.tsx
+│   │   ├── UserMode.tsx
+│   │   └── SubmissionsList.tsx
+│   ├── services/
+│   │   └── api.ts
+│   ├── types.ts
+│   ├── styles.ts
+│   └── App.tsx
+├── backend/
+│   ├── server.js
+│   └── package.json
+└── README.md
+```
+
+### 環境変数
+
+必要に応じて、以下の環境変数を設定できます：
+
+- `PORT` - バックエンドのポート番号（デフォルト: 3001）
+- `DB_PATH` - SQLiteデータベースのパス（デフォルト: ./form_data.db）
+
+## トラブルシューティング
+
+### バックエンドが起動しない場合
+
+1. Node.jsがインストールされているか確認
+2. バックエンドディレクトリで`npm install`を実行
+3. ポート3001が使用可能か確認
+
+### データが保存されない場合
+
+1. バックエンドサーバーが起動しているか確認
+2. ブラウザのコンソールでエラーを確認
+3. ネットワークタブでAPIリクエストを確認
+
+## ライセンス
+
+Apache License
