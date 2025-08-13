@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Field, Theme } from '../types';
+import { Field, Group, Theme } from '../types';
 import { createStyles } from '../styles';
 import { getDescriptionPreview, parseDescriptionWithLinks } from '../utils/textParser';
 
 interface AdminModeProps {
   fields: Field[];
   setFields: React.Dispatch<React.SetStateAction<Field[]>>;
+  groups: Group[];
+  setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
   theme: Theme;
   themeIndex: number;
   setThemeIndex: (index: number) => void;
@@ -18,6 +20,8 @@ interface AdminModeProps {
 export const AdminMode: React.FC<AdminModeProps> = ({
   fields,
   setFields,
+  groups,
+  setGroups,
   theme,
   themeIndex,
   setThemeIndex,
@@ -30,6 +34,26 @@ export const AdminMode: React.FC<AdminModeProps> = ({
   const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const styles = createStyles(theme);
+
+  // グループ操作
+  const addGroup = () => {
+    const id = `g_${Date.now()}`;
+    setGroups([...
+      groups,
+      { id, name: `グループ${groups.length + 1}`, padding: true }
+    ]);
+  };
+  const updateGroupName = (id: string, name: string) => {
+    setGroups(groups.map(g => g.id === id ? { ...g, name } : g));
+  };
+  const updateGroupPadding = (id: string, padding: boolean) => {
+    setGroups(groups.map(g => g.id === id ? { ...g, padding } : g));
+  };
+  const removeGroup = (id: string) => {
+    setGroups(groups.filter(g => g.id !== id));
+    // グループ削除時にフィールドのgroupIdをクリア
+    setFields(fields.map(f => f.groupId === id ? { ...f, groupId: undefined } as Field : f));
+  };
 
   // フィールド操作
   const addField = (type: "text" | "radio" | "checkbox") => {
@@ -283,6 +307,25 @@ export const AdminMode: React.FC<AdminModeProps> = ({
               onFocus={() => setFocusedId(field.id + "-label")}
               onBlur={() => setFocusedId(null)}
             />
+            {/* グループ割り当て */}
+            {groups.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: theme.primaryColor, marginRight: 8 }}>グループ:</label>
+                <select
+                  value={(field as any).groupId || ''}
+                  onChange={(e) => {
+                    const gid = e.target.value || undefined;
+                    setFields(fields.map(f => f.id === field.id ? ({ ...f, groupId: gid } as Field) : f));
+                  }}
+                  style={{ padding: 6, borderRadius: 6, border: `1.5px solid ${theme.primaryColor}55` }}
+                >
+                  <option value="">未分類</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <textarea
               value={field.description || ""}
               onChange={(e) => updateDescription(field.id, e.target.value)}
@@ -586,9 +629,40 @@ export const AdminMode: React.FC<AdminModeProps> = ({
         ))}
       </div>
 
-      {/* JSON入出力 */}
+      {/* JSON入出力 ＋ グループ管理 */}
       <div style={{ width: 320 }}>
         <h3 style={{ color: theme.primaryColor, marginBottom: 12 }}>JSON入出力</h3>
+        {/* グループ管理 */}
+        <div style={{ marginBottom: 16, padding: 12, border: `1px solid ${theme.primaryColor}33`, borderRadius: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <strong style={{ color: theme.primaryColor }}>グループ管理</strong>
+            <button type="button" onClick={addGroup} style={{ ...styles.buttonStyle, padding: '4px 8px', fontSize: 12 }}>グループ追加</button>
+          </div>
+          {groups.length === 0 ? (
+            <div style={{ fontSize: 12, opacity: 0.7, color: theme.textColor }}>グループがありません</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {groups.map(g => (
+                <div key={g.id} style={{ border: `1px solid ${theme.primaryColor}22`, borderRadius: 6, padding: 8 }}>
+                  <input
+                    type="text"
+                    value={g.name}
+                    onChange={(e) => updateGroupName(g.id, e.target.value)}
+                    placeholder="グループ名"
+                    style={{ ...styles.inputStyle, marginBottom: 6 }}
+                  />
+                  <label style={{ fontSize: 12 }}>
+                    <input type="checkbox" checked={!!g.padding} onChange={(e) => updateGroupPadding(g.id, e.target.checked)} style={{ marginRight: 6 }} />
+                    デフォルトpaddingを適用
+                  </label>
+                  <div>
+                    <button type="button" onClick={() => removeGroup(g.id)} style={{ marginTop: 6, background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 8px', cursor: 'pointer' }}>削除</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
             <input

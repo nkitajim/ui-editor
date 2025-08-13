@@ -1,10 +1,15 @@
 {
   "userModeOnly": false,
+  "groups": [
+    { "id": "g1", "name": "基本情報", "padding": false },
+    { "id": "g2", "name": "詳細", "padding": true }
+  ],
   "fields": [
     {
       "id": "1755072260346",
       "type": "radio",
-      "label": "ラジオ",
+      "groupId": "g1",
+      "label": "ラジオ1",
       "options": [
         "選択肢1",
         "選択肢2"
@@ -13,7 +18,8 @@
     {
       "id": "1755072261914",
       "type": "radio",
-      "label": "ラジオ",
+      "groupId": "g2",
+      "label": "ラジオ2",
       "options": [
         "選択肢1",
         "選択肢2"

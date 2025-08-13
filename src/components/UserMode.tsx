@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Field, Theme } from '../types';
+import { Field, Theme, Group } from '../types';
 import { createStyles } from '../styles';
 import { apiService } from '../services/api';
 import { SubmissionsList } from './SubmissionsList';
@@ -7,10 +7,11 @@ import { parseDescriptionWithLinks } from '../utils/textParser';
 
 interface UserModeProps {
   fields: Field[];
+  groups?: Group[];
   theme: Theme;
 }
 
-export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
+export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }) => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
@@ -19,6 +20,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [submissions, setSubmissions] = useState<Array<{ id: number; form_data: Record<string, any>; created_at?: string }>>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState<boolean>(false);
   const [submissionsError, setSubmissionsError] = useState<string | null>(null);
@@ -92,6 +94,24 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const hasErrors = () => {
     return Object.values(validationErrors).some(error => error !== "");
   };
+
+  // グループの折りたたみ初期化: padding === true のグループは折りたたむ
+  React.useEffect(() => {
+    if (!groups || groups.length === 0) return;
+    setCollapsedGroups(prev => {
+      const next: Record<string, boolean> = { ...prev };
+      for (const g of groups) {
+        if (typeof next[g.id] === 'undefined') {
+          next[g.id] = !!g.padding; // true の場合は折りたたみ
+        }
+      }
+      // なくなったグループは削除
+      Object.keys(next).forEach(id => {
+        if (!groups.find(g => g.id === id)) delete next[id];
+      });
+      return next;
+    });
+  }, [groups]);
 
   // 一覧取得
   const loadSubmissions = async () => {
@@ -273,7 +293,22 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
           }
         }}
       >
-        {fields.map((field) => (
+        {(groups.length > 0 ? groups : [{ id: 'ungrouped', name: 'フォーム', padding: false } as any]).map((group) => (
+          <div key={group.id} style={{ marginBottom: 24 }}>
+            {groups.length > 0 && (
+              <div
+                onClick={() => setCollapsedGroups(prev => ({ ...prev, [group.id]: !prev[group.id] }))}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'pointer', userSelect: 'none',
+                  fontWeight: 700, color: theme.primaryColor, marginBottom: 12,
+                }}
+              >
+                <span>{group.name}</span>
+                <span style={{ fontSize: 12, color: theme.textColor }}>{collapsedGroups[group.id] ? '▶ 開く' : '▼ 閉じる'}</span>
+              </div>
+            )}
+            {!groups.length || !collapsedGroups[group.id] ? fields.filter(f => (groups.length > 0 ? f.groupId === group.id : true)).map((field) => (
           <div key={field.id} style={{ marginBottom: 20 }}>
             <label
               style={{
@@ -400,6 +435,8 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
                 </>
               )}
             </div>
+          </div>
+            )) : null}
           </div>
         ))}
         {submitMessage && (

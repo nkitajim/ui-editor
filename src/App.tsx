@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Field, Mode, Theme, themes } from "./types";
+import { Field, Group, Mode, Theme, themes } from "./types";
 import { AdminMode } from "./components/AdminMode";
 import { UserMode } from "./components/UserMode";
 
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   };
 
   const [fields, setFields] = useState<Field[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [jsonInput, setJsonInput] = useState("");
   const [mode, setMode] = useState<Mode>(() => getInitialMode());
   const [userModeOnly, setUserModeOnly] = useState<boolean>(false);
@@ -49,6 +50,9 @@ const App: React.FC = () => {
           if (Array.isArray(cfg.fields)) {
             setFields(cfg.fields as Field[]);
           }
+          if (Array.isArray(cfg.groups)) {
+            setGroups(cfg.groups as Group[]);
+          }
           if (typeof cfg.userModeOnly === "boolean") {
             setUserModeOnly(cfg.userModeOnly);
             if (cfg.userModeOnly) {
@@ -73,13 +77,13 @@ const App: React.FC = () => {
     }
   }, [userModeOnly, mode]);
 
-  // fieldsが変更されたときにJSONを更新
+  // fields / groups が変更されたときにJSONを更新
   React.useEffect(() => {
     if (autoUpdateJson) {
-    const json = JSON.stringify(fields, null, 2);
+    const json = JSON.stringify({ groups, fields }, null, 2);
       setJsonInput(json);
     }
-  }, [fields, autoUpdateJson]);
+  }, [fields, groups, autoUpdateJson]);
 
   // モード変更時にURLクエリパラメータを更新（起動オプションでの指定も可能に）
   React.useEffect(() => {
@@ -169,11 +173,13 @@ const App: React.FC = () => {
       )}
 
       {userModeOnly ? (
-        <UserMode fields={fields} theme={theme} />
+        <UserMode fields={fields} theme={theme} groups={groups} />
       ) : mode === "admin" ? (
         <AdminMode
           fields={fields}
           setFields={setFields}
+          groups={groups}
+          setGroups={setGroups}
           theme={theme}
           themeIndex={themeIndex}
           setThemeIndex={setThemeIndex}
@@ -183,7 +189,7 @@ const App: React.FC = () => {
           setAutoUpdateJson={setAutoUpdateJson}
         />
       ) : (
-        <UserMode fields={fields} theme={theme} />
+        <UserMode fields={fields} theme={theme} groups={groups} />
       )}
     </div>
   );
