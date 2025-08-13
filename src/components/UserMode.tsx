@@ -19,6 +19,9 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [submissions, setSubmissions] = useState<Array<{ id: number; form_data: Record<string, any>; created_at?: string }>>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState<boolean>(false);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
   const styles = createStyles(theme);
 
   // バリデーション関数
@@ -89,6 +92,27 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const hasErrors = () => {
     return Object.values(validationErrors).some(error => error !== "");
   };
+
+  // 一覧取得
+  const loadSubmissions = async () => {
+    try {
+      setSubmissionsLoading(true);
+      setSubmissionsError(null);
+      const data = await apiService.getSubmissions();
+      setSubmissions(data);
+    } catch (e: any) {
+      setSubmissionsError(e?.message || 'データの取得に失敗しました');
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  };
+
+  // タブ切替で一覧表示になったら取得
+  React.useEffect(() => {
+    if (activeView === 'list') {
+      loadSubmissions();
+    }
+  }, [activeView]);
 
   // 一覧から選択されたデータをフォームに適用
   const handleSelectSubmission = (submission: { id: number; form_data: Record<string, any> }) => {
@@ -422,7 +446,22 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
           }}
         >
           <h3 style={{ color: theme.primaryColor, marginBottom: 12, textAlign: 'center' }}>保存されたデータ一覧</h3>
-          <SubmissionsList theme={theme} onSelect={handleSelectSubmission} />
+          <SubmissionsList
+            theme={theme}
+            submissions={submissions}
+            loading={submissionsLoading}
+            error={submissionsError}
+            onRefresh={loadSubmissions}
+            onSelect={handleSelectSubmission}
+            onDelete={async (id) => {
+              try {
+                await apiService.deleteSubmission(id);
+                loadSubmissions();
+              } catch (e) {
+                alert('削除に失敗しました');
+              }
+            }}
+          />
         </div>
       )}
     </div>
