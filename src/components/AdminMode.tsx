@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Field, Theme } from '../types';
 import { createStyles } from '../styles';
-import { getDescriptionPreview } from '../utils/textParser';
+import { getDescriptionPreview, parseDescriptionWithLinks } from '../utils/textParser';
 
 interface AdminModeProps {
   fields: Field[];
@@ -286,7 +286,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
             <textarea
               value={field.description || ""}
               onChange={(e) => updateDescription(field.id, e.target.value)}
-              placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+              placeholder="説明文（任意）&#10;リンク: [テキスト](URL)（例: [詳細はこちら](https://example.com)）&#10;太字: **重要**（例）&#10;小さな文字: ^^補足^^（例）"
               style={{
                 ...styles.inputStyle,
                 ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
@@ -311,7 +311,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                   border: `1px solid ${theme.primaryColor}33`,
                 }}
               >
-                <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+                <strong>プレビュー:</strong>{' '}
+                <span
+                  dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
+                />
               </div>
             )}
 
@@ -371,7 +374,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                     <textarea
                       value={field.description || ""}
                       onChange={(e) => updateDescription(field.id, e.target.value)}
-                      placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+                      placeholder="説明文（任意）&#10;リンク: [テキスト](URL)（例: [詳細はこちら](https://example.com)）&#10;太字: **重要**（例）&#10;小さな文字: ^^補足^^（例）"
                       style={{
                         ...styles.inputStyle,
                         ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
@@ -396,7 +399,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                           border: `1px solid ${theme.primaryColor}33`,
                         }}
                       >
-                        <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+                        <strong>プレビュー:</strong>{' '}
+                <span
+                  dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
+                />
                       </div>
                     )}
                     <input
@@ -479,7 +485,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                     <textarea
                       value={field.description || ""}
                       onChange={(e) => updateDescription(field.id, e.target.value)}
-                      placeholder="説明文（任意）&#10;リンクは [テキスト](URL) 形式で記述できます&#10;例: [詳細はこちら](https://example.com)"
+                      placeholder="説明文（任意）&#10;リンク: [テキスト](URL)（例: [詳細はこちら](https://example.com)）&#10;太字: **重要**（例）&#10;小さな文字: ^^補足^^（例）"
                       style={{
                         ...styles.inputStyle,
                         ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
@@ -504,7 +510,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                           border: `1px solid ${theme.primaryColor}33`,
                         }}
                       >
-                        <strong>プレビュー:</strong> {getDescriptionPreview(field.description)}
+                        <strong>プレビュー:</strong>{' '}
+                        <span
+                          dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
+                        />
                       </div>
                     )}
                     <input
