@@ -17,7 +17,6 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [radioValues, setRadioValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
   const [editingId, setEditingId] = useState<number | null>(null);
   const styles = createStyles(theme);
@@ -224,8 +223,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
             setValidationErrors({});
             setEditingId(null);
 
-            // 保存されたデータリストを更新
-            setRefreshTrigger(prev => prev + 1);
+            // 必要に応じて一覧側で再取得してください（外部更新トリガは削除）
 
             console.log('保存されたデータ:', output);
             console.log('保存結果:', result);
@@ -424,7 +422,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
           }}
         >
           <h3 style={{ color: theme.primaryColor, marginBottom: 12, textAlign: 'center' }}>保存されたデータ一覧</h3>
-          <SubmissionsList theme={theme} refreshTrigger={refreshTrigger} onSelect={handleSelectSubmission} />
+          <SubmissionsList theme={theme} onSelect={handleSelectSubmission} />
         </div>
       )}
     </div>

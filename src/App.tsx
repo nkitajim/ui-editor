@@ -24,6 +24,34 @@ const App: React.FC = () => {
   const [autoUpdateJson, setAutoUpdateJson] = useState(true);
   const theme = themes[themeIndex];
 
+  // 起動時にデフォルトのフォーム設定を外部ファイルから読み込み
+  // 優先順位: URL ?config= → REACT_APP_FORM_CONFIG → public/form-config.json
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadConfig = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlParam = params.get("config");
+        const envPath = (process.env.REACT_APP_FORM_CONFIG || "").trim();
+        const fallback = "form-config.json"; // public直下想定
+        const configUrl = urlParam || envPath || fallback;
+
+        const res = await fetch(configUrl, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setFields(data as Field[]);
+        }
+      } catch {
+        // 取得失敗時は無視（手動で作成可能）
+      }
+    };
+    loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // fieldsが変更されたときにJSONを更新
   React.useEffect(() => {
     if (autoUpdateJson) {
