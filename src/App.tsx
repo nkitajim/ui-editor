@@ -4,9 +4,22 @@ import { AdminMode } from "./components/AdminMode";
 import { UserMode } from "./components/UserMode";
 
 const App: React.FC = () => {
+  const getInitialMode = (): Mode => {
+    try {
+      const search = new URLSearchParams(window.location.search);
+      const qp = (search.get("mode") || "").toLowerCase();
+      if (qp === "admin" || qp === "user") return qp as Mode;
+      const hash = (window.location.hash || "").toLowerCase();
+      // 対応: #mode=user または #user
+      if (hash.includes("mode=user") || hash === "#user") return "user";
+      if (hash.includes("mode=admin") || hash === "#admin") return "admin";
+    } catch {}
+    return "admin";
+  };
+
   const [fields, setFields] = useState<Field[]>([]);
   const [jsonInput, setJsonInput] = useState("");
-  const [mode, setMode] = useState<Mode>("admin");
+  const [mode, setMode] = useState<Mode>(() => getInitialMode());
   const [themeIndex, setThemeIndex] = useState(0);
   const [autoUpdateJson, setAutoUpdateJson] = useState(true);
   const theme = themes[themeIndex];
@@ -18,6 +31,15 @@ const App: React.FC = () => {
       setJsonInput(json);
     }
   }, [fields, autoUpdateJson]);
+
+  // モード変更時にURLクエリパラメータを更新（起動オプションでの指定も可能に）
+  React.useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("mode", mode);
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  }, [mode]);
 
    return (
     <div

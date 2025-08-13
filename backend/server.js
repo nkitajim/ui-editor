@@ -89,6 +89,35 @@ app.get('/api/submissions', (req, res) => {
   );
 });
 
+// 既存のフォームデータを更新するAPI
+app.put('/api/submissions/:id', (req, res) => {
+  const id = req.params.id;
+  const formData = req.body;
+
+  if (!formData) {
+    return res.status(400).json({ error: 'フォームデータが必要です' });
+  }
+
+  const jsonData = JSON.stringify(formData);
+
+  db.run(
+    'UPDATE form_submissions SET form_data = ? WHERE id = ?',
+    [jsonData, id],
+    function (err) {
+      if (err) {
+        console.error('データ更新エラー:', err.message);
+        return res.status(500).json({ error: 'データの更新に失敗しました' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: '指定されたIDのデータが見つかりません' });
+      }
+
+      res.json({ success: true, message: 'データを更新しました', id: Number(id) });
+    }
+  );
+});
+
 // 特定のフォームデータを取得するAPI
 app.get('/api/submissions/:id', (req, res) => {
   const id = req.params.id;

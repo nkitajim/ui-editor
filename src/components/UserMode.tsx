@@ -14,9 +14,12 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
+  const [radioValues, setRadioValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [activeView, setActiveView] = useState<'form' | 'list'>('form');
+  const [editingId, setEditingId] = useState<number | null>(null);
   const styles = createStyles(theme);
 
   // バリデーション関数
@@ -88,19 +91,90 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
     return Object.values(validationErrors).some(error => error !== "");
   };
 
+  // 一覧から選択されたデータをフォームに適用
+  const handleSelectSubmission = (submission: { id: number; form_data: Record<string, any> }) => {
+    const incoming = submission.form_data || {};
+    const nextTextValues: Record<string, string> = {};
+    const nextCheckboxValues: Record<string, string[]> = {};
+    const nextRadioValues: Record<string, string> = {};
+
+    for (const field of fields) {
+      const label = field.label;
+      const value = incoming[label];
+      if (field.type === 'text') {
+        nextTextValues[field.id] = typeof value === 'string' ? value : '';
+      } else if (field.type === 'radio') {
+        nextRadioValues[field.id] = typeof value === 'string' ? value : (field.defaultValue || '');
+      } else if (field.type === 'checkbox') {
+        nextCheckboxValues[field.id] = Array.isArray(value) ? value : (Array.isArray(field.defaultValue) ? field.defaultValue : []);
+      }
+    }
+
+    setFormValues(nextTextValues);
+    setRadioValues(nextRadioValues);
+    setCheckboxValues(nextCheckboxValues);
+    setActiveView('form');
+    // 編集IDを保持（送信時に更新APIを呼ぶため）
+    setEditingId(submission.id);
+    setSubmitMessage({ type: 'success', text: '保存データをフォームに読み込みました。' });
+    setTimeout(() => setSubmitMessage(null), 2000);
+  };
+
   return (
     <div
       style={{
-        maxWidth: 600,
+        maxWidth: 800,
         margin: "0 auto",
-        backgroundColor: theme.name === "ダーク" ? "#22303f" : "white",
-        borderRadius: 12,
-        padding: 24,
-        boxShadow: theme.name === "ダーク" ? "none" : "0 4px 25px rgba(0,0,0,0.1)",
         color: theme.textColor,
       }}
     >
-      <h3 style={{ color: theme.primaryColor, marginBottom: 20, textAlign: "center" }}>ユーザーモード（フォーム）</h3>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 16 }}>
+        <button
+          type="button"
+          onClick={() => setActiveView('form')}
+          style={{
+            backgroundColor: activeView === 'form' ? '#a3c0ff' : theme.primaryColor,
+            color: activeView === 'form' ? '#333' : (theme.textColor === '#ddd' ? '#fff' : 'white'),
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 6,
+            cursor: activeView === 'form' ? 'default' : 'pointer',
+            fontWeight: 600,
+            boxShadow: activeView === 'form' ? 'none' : `0 2px 6px ${theme.primaryColor}66`,
+          }}
+        >
+          入力フォーム
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveView('list')}
+          style={{
+            backgroundColor: activeView === 'list' ? '#a3c0ff' : theme.primaryColor,
+            color: activeView === 'list' ? '#333' : (theme.textColor === '#ddd' ? '#fff' : 'white'),
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: 6,
+            cursor: activeView === 'list' ? 'default' : 'pointer',
+            fontWeight: 600,
+            boxShadow: activeView === 'list' ? 'none' : `0 2px 6px ${theme.primaryColor}66`,
+          }}
+        >
+          保存された一覧
+        </button>
+      </div>
+
+      {activeView === 'form' && (
+        <div
+          style={{
+            backgroundColor: theme.name === 'ダーク' ? '#22303f' : 'white',
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: theme.name === 'ダーク' ? 'none' : '0 4px 25px rgba(0,0,0,0.1)',
+          }}
+        >
+          <h3 style={{ color: theme.primaryColor, marginBottom: 20, textAlign: 'center' }}>
+            ユーザーモード（フォーム）{editingId != null ? ' - 編集モード' : ''}
+          </h3>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -122,9 +196,8 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
                 const val = formValues[field.id] || field.defaultValue || "";
                 output[field.label] = val;
               } else if (field.type === "radio") {
-                const formData = new FormData(e.currentTarget);
-                const selectedValue = formData.get(field.id);
-                output[field.label] = selectedValue || field.defaultValue || "";
+                const selectedValue = radioValues[field.id] ?? field.defaultValue ?? "";
+                output[field.label] = selectedValue;
               } else if (field.type === "checkbox") {
                 const values = checkboxValues[field.id] || [];
                 // 選択された値がない場合はデフォルト値を使用
@@ -132,8 +205,13 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
               }
             }
 
-            // SQLiteにデータを保存
-            const result = await apiService.submitForm(output);
+            // SQLite: 新規 or 更新
+            let result: any;
+            if (editingId != null) {
+              result = await apiService.updateSubmission(editingId, output);
+            } else {
+              result = await apiService.submitForm(output);
+            }
             
             setSubmitMessage({ 
               type: 'success', 
@@ -144,6 +222,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
             setFormValues({});
             setCheckboxValues({});
             setValidationErrors({});
+            setEditingId(null);
 
             // 保存されたデータリストを更新
             setRefreshTrigger(prev => prev + 1);
@@ -244,7 +323,12 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
                       type="radio"
                       name={field.id}
                       value={opt}
-                      defaultChecked={field.defaultValue === opt}
+                      checked={(radioValues[field.id] ?? field.defaultValue) === opt}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setRadioValues(prev => ({ ...prev, [field.id]: opt }));
+                        }
+                      }}
                       style={{ marginRight: 6, cursor: "pointer" }}
                     />
                     {opt}
@@ -326,8 +410,23 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
           {isSubmitting ? "送信中..." : hasErrors() ? "エラーがあります" : "送信"}
         </button>
       </form>
-      
-      <SubmissionsList theme={theme} refreshTrigger={refreshTrigger} />
+        </div>
+      )}
+
+      {activeView === 'list' && (
+        <div
+          style={{
+            backgroundColor: theme.name === 'ダーク' ? '#22303f' : 'white',
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: theme.name === 'ダーク' ? 'none' : '0 4px 25px rgba(0,0,0,0.1)',
+            marginTop: 12,
+          }}
+        >
+          <h3 style={{ color: theme.primaryColor, marginBottom: 12, textAlign: 'center' }}>保存されたデータ一覧</h3>
+          <SubmissionsList theme={theme} refreshTrigger={refreshTrigger} onSelect={handleSelectSubmission} />
+        </div>
+      )}
     </div>
   );
 };
