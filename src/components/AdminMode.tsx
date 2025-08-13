@@ -30,7 +30,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
   autoUpdateJson,
   setAutoUpdateJson,
 }) => {
-  const [dragging, setDragging] = useState<"text" | "radio" | "checkbox" | "map" | null>(null);
+  const [dragging, setDragging] = useState<"text" | "radio" | "checkbox" | "map" | "list" | null>(null);
   const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [mapDefaultRows, setMapDefaultRows] = useState<Record<string, { key: string; value: string }[]>>({});
@@ -57,7 +57,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
   };
 
   // フィールド操作
-  const addField = (type: "text" | "radio" | "checkbox" | "map") => {
+  const addField = (type: "text" | "radio" | "checkbox" | "map" | "list") => {
     const id = Date.now().toString();
     if (type === "text") {
       setFields([...fields, { id, type, label: "テキスト" }]);
@@ -65,8 +65,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
       setFields([...fields, { id, type, label: "ラジオ", options: ["選択肢1", "選択肢2"] }]);
     } else if (type === "checkbox") {
       setFields([...fields, { id, type, label: "チェック", options: ["項目1", "項目2"] }]);
-    } else {
+    } else if (type === 'map') {
       setFields([...fields, { id, type, label: "マップ", defaultValue: {} } as any]);
+    } else if (type === 'list') {
+      setFields([...fields, { id, type, label: "リスト", defaultValue: [] } as any]);
     }
   };
 
@@ -93,6 +95,10 @@ export const AdminMode: React.FC<AdminModeProps> = ({
 
   const updateTextValidationRegex = (id: string, regex: string | undefined) => {
     setFields(fields.map(f => (f.id === id && f.type === "text") ? { ...f, validationRegex: regex } : f));
+  };
+
+  const updateListValidationRegex = (id: string, regex: string | undefined) => {
+    setFields(fields.map(f => (f.id === id && (f as any).type === 'list') ? ({ ...(f as any), validationRegex: regex } as Field) : f));
   };
 
   const updateMapValidationRegex = (id: string, kind: 'key' | 'value', regex: string | undefined) => {
@@ -279,6 +285,14 @@ export const AdminMode: React.FC<AdminModeProps> = ({
         >
           マップ（キー/値）
         </div>
+        <div
+          draggable
+          onDragStart={() => setDragging("list")}
+          onDragEnd={() => setDragging(null)}
+          style={styles.paletteItemStyle}
+        >
+          リスト（テキスト）
+        </div>
       </div>
 
       {/* フォーム編集エリア */}
@@ -376,7 +390,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                   textTransform: "uppercase",
                 }}
               >
-                {field.type === "text" ? "テキスト" : field.type === "radio" ? "ラジオ" : "チェック"}
+                {field.type === "text" ? "テキスト" : field.type === "radio" ? "ラジオ" : field.type === 'checkbox' ? "チェック" : field.type === 'map' ? 'マップ' : 'リスト'}
               </span>
             </div>
 
@@ -592,6 +606,74 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                     color: theme.textColor === "#ddd" ? "#ccc" : "#555",
                     marginTop: 8,
                   }}
+                />
+              </>
+            )}
+
+            {((field as any).type === 'list') && (
+              <>
+                {(((field as any).defaultValue as string[] | undefined) ?? []).map((val, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <input
+                      type="text"
+                      placeholder={`項目 ${idx + 1}`}
+                      value={val}
+                      onChange={(e) => {
+                        const items = [ ...(((field as any).defaultValue as string[] | undefined) ?? []) ];
+                        items[idx] = e.target.value;
+                        setFields(fields.map(f => f.id === field.id ? ({ ...(f as any), defaultValue: items } as Field) : f));
+                      }}
+                      style={{
+                        ...styles.inputStyle,
+                        flex: 1,
+                        backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                        color: theme.textColor,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const items = [ ...(((field as any).defaultValue as string[] | undefined) ?? []) ].filter((_, i) => i !== idx);
+                        setFields(fields.map(f => f.id === field.id ? ({ ...(f as any), defaultValue: items } as Field) : f));
+                      }}
+                      style={{
+                        backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: 6,
+                        padding: '8px 10px', cursor: 'pointer', fontWeight: 600
+                      }}
+                      title="行を削除"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const items = [ ...(((field as any).defaultValue as string[] | undefined) ?? []) , '' ];
+                      setFields(fields.map(f => f.id === field.id ? ({ ...(f as any), defaultValue: items } as Field) : f));
+                    }}
+                    style={{ ...styles.buttonStyle }}
+                  >
+                    行を追加
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="各項目の正規表現 (例: ^[0-9]+$)"
+                  value={(field as any).validationRegex || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    updateListValidationRegex(field.id, val || undefined);
+                  }}
+                  style={{
+                    ...styles.inputStyle,
+                    ...(focusedId === field.id + "-listregex" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                    backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                    color: theme.textColor,
+                  }}
+                  onFocus={() => setFocusedId(field.id + "-listregex")}
+                  onBlur={() => setFocusedId(null)}
                 />
               </>
             )}

@@ -17,6 +17,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
   const [radioValues, setRadioValues] = useState<Record<string, string>>({});
   const [mapValues, setMapValues] = useState<Record<string, { key: string; value: string }[]>>({});
+  const [listValues, setListValues] = useState<Record<string, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
@@ -75,7 +76,45 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
       }
     }
 
+    // list の正規表現（各要素）
+    if ((field as any).type === 'list') {
+      const items = listValues[fieldId] ?? [];
+      const reStr = (field as any).validationRegex as string | undefined;
+      if (!reStr) return null;
+      let re: RegExp;
+      try {
+        re = new RegExp(reStr);
+      } catch {
+        return 'リストの正規表現が不正です。';
+      }
+      for (const item of items) {
+        if (!re.test(item)) return `リストの要素が正規表現 "${reStr}" に一致しません`;
+      }
+    }
+
     return null;
+  };
+
+  // list 入力操作
+  const updateListItem = (fieldId: string, index: number, text: string) => {
+    setListValues(prev => {
+      const next = [ ...(prev[fieldId] ?? []) ];
+      next[index] = text;
+      return { ...prev, [fieldId]: next };
+    });
+    const err = validateField(fieldId, '');
+    setValidationErrors(prev => ({ ...prev, [fieldId]: err || '' }));
+  };
+  const addListItem = (fieldId: string) => {
+    setListValues(prev => ({ ...prev, [fieldId]: [ ...(prev[fieldId] ?? []), '' ] }));
+  };
+  const removeListItem = (fieldId: string, index: number) => {
+    setListValues(prev => {
+      const next = [ ...(prev[fieldId] ?? []) ].filter((_, i) => i !== index);
+      return { ...prev, [fieldId]: next };
+    });
+    const err = validateField(fieldId, '');
+    setValidationErrors(prev => ({ ...prev, [fieldId]: err || '' }));
   };
 
   // チェックボックスの必須項目バリデーション
@@ -231,6 +270,15 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
       }
       return next;
     });
+    setListValues(prev => {
+      const next: Record<string, string[]> = { ...prev };
+      for (const f of fields) {
+        if ((f as any).type === 'list' && !next[f.id]) {
+          next[f.id] = ((f as any).defaultValue as string[] | undefined) ?? [];
+        }
+      }
+      return next;
+    });
   }, [fields]);
 
   // 一覧から選択されたデータをフォームに適用
@@ -240,6 +288,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
     const nextCheckboxValues: Record<string, string[]> = {};
     const nextRadioValues: Record<string, string> = {};
     const nextMapValues: Record<string, { key: string; value: string }[]> = {};
+    const nextListValues: Record<string, string[]> = {};
 
     for (const field of fields) {
       const label = field.label;
@@ -253,6 +302,8 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
       } else if ((field as any).type === 'map') {
         const obj = (value && typeof value === 'object') ? value as Record<string, any> : ((field as any).defaultValue || {});
         nextMapValues[field.id] = Object.entries(obj).map(([k, v]) => ({ key: String(k), value: String(v) }));
+      } else if ((field as any).type === 'list') {
+        nextListValues[field.id] = Array.isArray(value) ? (value as string[]) : ((((field as any).defaultValue as string[] | undefined) ?? []));
       }
     }
 
@@ -260,6 +311,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
     setRadioValues(nextRadioValues);
     setCheckboxValues(nextCheckboxValues);
     setMapValues(prev => ({ ...prev, ...nextMapValues }));
+    setListValues(prev => ({ ...prev, ...nextListValues }));
     setActiveView('form');
     // 編集IDを保持（送信時に更新APIを呼ぶため）
     setEditingId(submission.id);
@@ -385,6 +437,25 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
                 const values = checkboxValues[field.id] || [];
                 // 選択された値がない場合はデフォルト値を使用
                 output[field.label] = values.length > 0 ? values : (field.defaultValue as string[] || []);
+              } else if ((field as any).type === 'list') {
+                const items = listValues[field.id] ?? [];
+                // バリデーション（送信時）
+                const reStr = (field as any).validationRegex as string | undefined;
+                if (reStr) {
+                  try {
+                    const re = new RegExp(reStr);
+                    for (const t of items) {
+                      if (!re.test(t)) {
+                        setSubmitMessage({ type: 'error', text: 'リストの要素が正規表現に一致しません。' });
+                        return;
+                      }
+                    }
+                  } catch {
+                    setSubmitMessage({ type: 'error', text: 'リストの正規表現が不正です。' });
+                    return;
+                  }
+                }
+                output[field.label] = items.length > 0 ? items : ((((field as any).defaultValue as string[] | undefined) ?? []));
               }
             }
 
@@ -549,6 +620,55 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, groups = [], theme }
                     <button
                       type="button"
                       onClick={() => addMapEntry(field.id)}
+                      style={{ ...styles.buttonStyle }}
+                    >
+                      行を追加
+                    </button>
+                  </div>
+                  {validationErrors[field.id] && (
+                    <div
+                      style={{
+                        color: '#ff4d4f', fontSize: 12, marginTop: 4, fontWeight: '500'
+                      }}
+                    >
+                      {validationErrors[field.id]}
+                    </div>
+                  )}
+                </>
+              )}
+              {((field as any).type === 'list') && (
+                <>
+                  {(listValues[field.id] ?? []).map((val, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <input
+                        type="text"
+                        placeholder={`項目 ${idx + 1}`}
+                        value={val}
+                        onChange={(e) => updateListItem(field.id, idx, e.target.value)}
+                        style={{
+                          ...styles.inputStyle,
+                          flex: 1,
+                          backgroundColor: theme.name === 'ダーク' ? '#2c3e50' : undefined,
+                          color: theme.textColor,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeListItem(field.id, idx)}
+                        style={{
+                          backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: 6,
+                          padding: '8px 10px', cursor: 'pointer', fontWeight: 600
+                        }}
+                        title="行を削除"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => addListItem(field.id)}
                       style={{ ...styles.buttonStyle }}
                     >
                       行を追加
