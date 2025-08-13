@@ -46,6 +46,8 @@ const App: React.FC = () => {
   const [jsonInput, setJsonInput] = useState("");
   const [mode, setMode] = useState<Mode>("admin");
   const [themeIndex, setThemeIndex] = useState(0);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
   const theme = themes[themeIndex];
 
   // フィールド操作は以前のまま
@@ -134,6 +136,40 @@ const App: React.FC = () => {
     } catch {
       alert("JSONの解析に失敗しました");
     }
+  };
+
+  // バリデーション関数
+  const validateField = (fieldId: string, value: string): string | null => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field || field.type !== "text" || !field.validationRegex) {
+      return null;
+    }
+
+    try {
+      const regex = new RegExp(field.validationRegex);
+      if (!regex.test(value)) {
+        return `入力値が正規表現 "${field.validationRegex}" にマッチしません`;
+      }
+    } catch (error) {
+      return "正規表現が不正です";
+    }
+
+    return null;
+  };
+
+  const handleInputChange = (fieldId: string, value: string) => {
+    setFormValues(prev => ({ ...prev, [fieldId]: value }));
+    
+    // バリデーション実行
+    const error = validateField(fieldId, value);
+    setValidationErrors(prev => ({
+      ...prev,
+      [fieldId]: error || ""
+    }));
+  };
+
+  const hasErrors = () => {
+    return Object.values(validationErrors).some(error => error !== "");
   };
 
   // 以下、スタイルはテーマ変数を使う
@@ -580,28 +616,24 @@ const App: React.FC = () => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const formData = new FormData(e.currentTarget);
+              
+              // エラーがある場合は送信しない
+              if (hasErrors()) {
+                alert("入力エラーがあります。修正してください。");
+                return;
+              }
+
               const output: Record<string, any> = {};
 
               for (const field of fields) {
                 if (field.type === "text") {
-                  const val = formData.get(field.id)?.toString() || "";
-                  if (field.validationRegex) {
-                    try {
-                      const re = new RegExp(field.validationRegex);
-                      if (!re.test(val)) {
-                        alert(`"${field.label}" の入力値が正規表現 "${field.validationRegex}" にマッチしません。`);
-                        return;
-                      }
-                    } catch {
-                      alert(`"${field.label}" の正規表現が不正です。`);
-                      return;
-                    }
-                  }
+                  const val = formValues[field.id] || field.defaultValue || "";
                   output[field.label] = val;
                 } else if (field.type === "radio") {
+                  const formData = new FormData(e.currentTarget);
                   output[field.label] = formData.get(field.id);
                 } else if (field.type === "checkbox") {
+                  const formData = new FormData(e.currentTarget);
                   const values: string[] = [];
                   field.options.forEach((opt, idx) => {
                     const val = formData.get(`${field.id}-${idx}`);
@@ -631,18 +663,35 @@ const App: React.FC = () => {
                 </label>
                 <div>
                   {field.type === "text" && (
-                    <input
-                      type="text"
-                      name={field.id}
-                      defaultValue={field.defaultValue as string | undefined}
-                      style={{
-                        ...inputStyle,
-                        borderColor: theme.primaryColor,
-                        boxShadow: `0 0 6px ${theme.primaryColor}55`,
-                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                        color: theme.textColor,
-                      }}
-                    />
+                    <>
+                      <input
+                        type="text"
+                        name={field.id}
+                        value={formValues[field.id] || field.defaultValue || ""}
+                        onChange={(e) => handleInputChange(field.id, e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          borderColor: validationErrors[field.id] ? "#ff4d4f" : theme.primaryColor,
+                          boxShadow: validationErrors[field.id] 
+                            ? `0 0 6px #ff4d4f55` 
+                            : `0 0 6px ${theme.primaryColor}55`,
+                          backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                          color: theme.textColor,
+                        }}
+                      />
+                      {validationErrors[field.id] && (
+                        <div
+                          style={{
+                            color: "#ff4d4f",
+                            fontSize: 12,
+                            marginTop: 4,
+                            fontWeight: "500",
+                          }}
+                        >
+                          {validationErrors[field.id]}
+                        </div>
+                      )}
+                    </>
                   )}
                   {field.type === "radio" &&
                     field.options.map((opt, idx) => (
@@ -697,9 +746,16 @@ const App: React.FC = () => {
             ))}
             <button
               type="submit"
-              style={{ ...buttonStyle, width: "100%", fontSize: 16, padding: "12px 0" }}
+              disabled={hasErrors()}
+              style={{ 
+                ...(hasErrors() ? buttonDisabledStyle : buttonStyle), 
+                width: "100%", 
+                fontSize: 16, 
+                padding: "12px 0",
+                backgroundColor: hasErrors() ? "#a3c0ff" : buttonStyle.backgroundColor,
+              }}
             >
-              送信
+              {hasErrors() ? "エラーがあります" : "送信"}
             </button>
           </form>
         </div>
