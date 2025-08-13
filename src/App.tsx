@@ -3,7 +3,7 @@ import React, { useState } from "react";
 type Field =
   | { id: string; type: "text"; label: string; defaultValue?: string; validationRegex?: string }
   | { id: string; type: "radio"; label: string; options: string[]; defaultValue?: string }
-  | { id: string; type: "checkbox"; label: string; options: string[]; defaultValue?: string[] };
+  | { id: string; type: "checkbox"; label: string; options: string[]; defaultValue?: string[]; requiredOptions?: string[]; errorMessage?: string };
 
 type Mode = "admin" | "user";
 
@@ -48,7 +48,11 @@ const App: React.FC = () => {
   const [themeIndex, setThemeIndex] = useState(0);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
+  const [autoUpdateJson, setAutoUpdateJson] = useState(true);
   const theme = themes[themeIndex];
+
+
 
   // フィールド操作は以前のまま
   const addField = (type: "text" | "radio" | "checkbox") => {
@@ -78,6 +82,14 @@ const App: React.FC = () => {
     setFields(fields.map(f => f.id === id && f.type === "text" ? { ...f, validationRegex: regex } : f));
   };
 
+  const updateRequiredOptions = (id: string, requiredOptions: string[]) => {
+    setFields(fields.map(f => f.id === id && f.type === "checkbox" ? { ...f, requiredOptions: requiredOptions.length > 0 ? requiredOptions : undefined } : f));
+  };
+
+  const updateErrorMessage = (id: string, errorMessage: string) => {
+    setFields(fields.map(f => f.id === id && f.type === "checkbox" ? { ...f, errorMessage: errorMessage || undefined } : f));
+  };
+
   const updateDefaultValue = (id: string, defaultValue: string) => {
     setFields(fields.map(f => {
       if (f.id === id) {
@@ -85,6 +97,10 @@ const App: React.FC = () => {
           return { ...f, defaultValue: defaultValue || undefined };
         } else if (f.type === "radio") {
           return { ...f, defaultValue: defaultValue || undefined };
+        } else if (f.type === "checkbox") {
+          // チェックボックスの場合は配列として処理
+          const values = defaultValue ? defaultValue.split(',').map(v => v.trim()).filter(v => v) : [];
+          return { ...f, defaultValue: values.length > 0 ? values : undefined };
         }
       }
       return f;
@@ -128,6 +144,20 @@ const App: React.FC = () => {
     alert("JSONをコンソールに出力しました");
   };
 
+  const updateJsonOutput = () => {
+    if (autoUpdateJson) {
+      const json = JSON.stringify(fields, null, 2);
+      setJsonInput(json);
+    }
+  };
+
+  // fieldsが変更されたときにJSONを更新
+  React.useEffect(() => {
+    if (autoUpdateJson) {
+      updateJsonOutput();
+    }
+  }, [fields, autoUpdateJson]);
+
   const loadJSON = () => {
     try {
       const parsed: Field[] = JSON.parse(jsonInput);
@@ -161,11 +191,46 @@ const App: React.FC = () => {
     return null;
   };
 
+  // チェックボックスの必須項目バリデーション
+  const validateCheckboxRequired = (fieldId: string, checkedValues: string[]): string | null => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field || field.type !== "checkbox" || !field.requiredOptions) {
+      return null;
+    }
+
+    const missingOptions = field.requiredOptions.filter(option => !checkedValues.includes(option));
+    if (missingOptions.length > 0) {
+      return field.errorMessage || `以下の項目は必須です: ${missingOptions.join(", ")}`;
+    }
+
+    return null;
+  };
+
   const handleInputChange = (fieldId: string, value: string) => {
     setFormValues(prev => ({ ...prev, [fieldId]: value }));
     
     // バリデーション実行
     const error = validateField(fieldId, value);
+    setValidationErrors(prev => ({
+      ...prev,
+      [fieldId]: error || ""
+    }));
+  };
+
+  const handleCheckboxChange = (fieldId: string, option: string, checked: boolean) => {
+    const currentValues = checkboxValues[fieldId] || [];
+    let newValues: string[];
+    
+    if (checked) {
+      newValues = [...currentValues, option];
+    } else {
+      newValues = currentValues.filter(val => val !== option);
+    }
+    
+    setCheckboxValues(prev => ({ ...prev, [fieldId]: newValues }));
+    
+    // チェックボックスのバリデーション実行
+    const error = validateCheckboxRequired(fieldId, newValues);
     setValidationErrors(prev => ({
       ...prev,
       [fieldId]: error || ""
@@ -557,6 +622,54 @@ const App: React.FC = () => {
                 {/* チェックボックス */}
                 {field.type === "checkbox" && (
                   <>
+                    <input
+                      type="text"
+                      placeholder="デフォルト値（カンマ区切りで選択肢を入力）"
+                      value={Array.isArray(field.defaultValue) ? field.defaultValue.join(",") : ""}
+                      onChange={(e) => updateDefaultValue(field.id, e.target.value)}
+                      style={{
+                        ...inputStyle,
+                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-default")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="必須項目（カンマ区切りで選択肢を入力）"
+                      value={Array.isArray(field.requiredOptions) ? field.requiredOptions.join(",") : ""}
+                      onChange={(e) => {
+                        const values = e.target.value ? e.target.value.split(',').map(v => v.trim()).filter(v => v) : [];
+                        updateRequiredOptions(field.id, values);
+                      }}
+                      style={{
+                        ...inputStyle,
+                        ...(focusedId === field.id + "-required" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-required")}
+                      onBlur={() => setFocusedId(null)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="エラーメッセージ（例：この項目は必須です）"
+                      value={field.errorMessage || ""}
+                      onChange={(e) => updateErrorMessage(field.id, e.target.value)}
+                      style={{
+                        ...inputStyle,
+                        ...(focusedId === field.id + "-error" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-error")}
+                      onBlur={() => setFocusedId(null)}
+                    />
                     {field.options.map((opt, idx) => {
                       const checked =
                         Array.isArray(field.defaultValue) && field.defaultValue.includes(opt);
@@ -649,12 +762,23 @@ const App: React.FC = () => {
           {/* JSON入出力 */}
           <div style={{ width: 320 }}>
             <h3 style={{ color: theme.primaryColor, marginBottom: 12 }}>JSON入出力</h3>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={autoUpdateJson}
+                  onChange={(e) => setAutoUpdateJson(e.target.checked)}
+                  style={{ marginRight: 8, cursor: "pointer" }}
+                />
+                <span style={{ fontSize: 14, color: theme.textColor }}>自動更新</span>
+              </label>
+            </div>
             <textarea
               value={jsonInput}
               onChange={(e) => setJsonInput(e.target.value)}
               style={{
                 width: "100%",
-                height: 340,
+                height: 300,
                 borderRadius: 12,
                 border: `1.5px solid ${theme.primaryColor}66`,
                 padding: 12,
@@ -713,13 +837,9 @@ const App: React.FC = () => {
                   const selectedValue = formData.get(field.id);
                   output[field.label] = selectedValue || field.defaultValue || "";
                 } else if (field.type === "checkbox") {
-                  const formData = new FormData(e.currentTarget);
-                  const values: string[] = [];
-                  field.options.forEach((opt, idx) => {
-                    const val = formData.get(`${field.id}-${idx}`);
-                    if (val) values.push(val.toString());
-                  });
-                  output[field.label] = values;
+                  const values = checkboxValues[field.id] || [];
+                  // 選択された値がない場合はデフォルト値を使用
+                  output[field.label] = values.length > 0 ? values : (field.defaultValue as string[] || []);
                 }
               }
 
@@ -795,32 +915,49 @@ const App: React.FC = () => {
                         {opt}
                       </label>
                     ))}
-                  {field.type === "checkbox" &&
-                    field.options.map((opt, idx) => {
-                      const checked =
-                        Array.isArray(field.defaultValue) && field.defaultValue.includes(opt);
-                      return (
-                        <label
-                          key={idx}
+                  {field.type === "checkbox" && (
+                    <>
+                      {field.options.map((opt, idx) => {
+                        const currentValues = checkboxValues[field.id] || [];
+                        const isDefaultChecked = Array.isArray(field.defaultValue) && field.defaultValue.includes(opt);
+                        const isChecked = currentValues.includes(opt) || (currentValues.length === 0 && isDefaultChecked);
+                        return (
+                          <label
+                            key={idx}
+                            style={{
+                              marginRight: 16,
+                              cursor: "pointer",
+                              userSelect: "none",
+                              fontSize: 15,
+                              color: theme.textColor,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              name={`${field.id}-${idx}`}
+                              value={opt}
+                              checked={isChecked}
+                              onChange={(e) => handleCheckboxChange(field.id, opt, e.target.checked)}
+                              style={{ marginRight: 6, cursor: "pointer" }}
+                            />
+                            {opt}
+                          </label>
+                        );
+                      })}
+                      {validationErrors[field.id] && (
+                        <div
                           style={{
-                            marginRight: 16,
-                            cursor: "pointer",
-                            userSelect: "none",
-                            fontSize: 15,
-                            color: theme.textColor,
+                            color: "#ff4d4f",
+                            fontSize: 12,
+                            marginTop: 8,
+                            fontWeight: "500",
                           }}
                         >
-                          <input
-                            type="checkbox"
-                            name={`${field.id}-${idx}`}
-                            value={opt}
-                            defaultChecked={checked}
-                            style={{ marginRight: 6, cursor: "pointer" }}
-                          />
-                          {opt}
-                        </label>
-                      );
-                    })}
+                          {validationErrors[field.id]}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             ))}
