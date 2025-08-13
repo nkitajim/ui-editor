@@ -76,6 +76,15 @@ const App: React.FC = () => {
     setFields(fields.map(f => f.id === id && f.type === "text" ? { ...f, validationRegex: regex } : f));
   };
 
+  const updateDefaultValue = (id: string, defaultValue: string) => {
+    setFields(fields.map(f => {
+      if (f.id === id && f.type === "text") {
+        return { ...f, defaultValue: defaultValue || undefined };
+      }
+      return f;
+    }));
+  };
+
   // フィールドの移動機能
   const moveField = (fromIndex: number, toIndex: number) => {
     const newFields = [...fields];
@@ -384,6 +393,7 @@ const App: React.FC = () => {
                       type="text"
                       placeholder="デフォルト値"
                       value={field.defaultValue || ""}
+                      onChange={(e) => updateDefaultValue(field.id, e.target.value)}
                       style={{
                         ...inputStyle,
                         ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
@@ -429,20 +439,6 @@ const App: React.FC = () => {
                 {/* ラジオボタン */}
                 {field.type === "radio" && (
                   <>
-                    <input
-                      type="text"
-                      placeholder="デフォルト値"
-                      value={field.defaultValue || ""}
-                      style={{
-                        ...inputStyle,
-                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                        marginBottom: 12,
-                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                        color: theme.textColor,
-                      }}
-                      onFocus={() => setFocusedId(field.id + "-default")}
-                      onBlur={() => setFocusedId(null)}
-                    />
                     {field.options.map((opt, idx) => (
                       <div key={idx} style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
                         <input type="radio" disabled checked={field.defaultValue === opt} />
@@ -477,20 +473,6 @@ const App: React.FC = () => {
                 {/* チェックボックス */}
                 {field.type === "checkbox" && (
                   <>
-                    <input
-                      type="text"
-                      placeholder="デフォルト値（カンマ区切り）"
-                      value={Array.isArray(field.defaultValue) ? field.defaultValue.join(",") : ""}
-                      style={{
-                        ...inputStyle,
-                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                        marginBottom: 12,
-                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                        color: theme.textColor,
-                      }}
-                      onFocus={() => setFocusedId(field.id + "-default")}
-                      onBlur={() => setFocusedId(null)}
-                    />
                     {field.options.map((opt, idx) => {
                       const checked =
                         Array.isArray(field.defaultValue) && field.defaultValue.includes(opt);
