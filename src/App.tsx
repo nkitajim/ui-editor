@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [fields, setFields] = useState<Field[]>([]);
   const [jsonInput, setJsonInput] = useState("");
   const [mode, setMode] = useState<Mode>(() => getInitialMode());
+  const [userModeOnly, setUserModeOnly] = useState<boolean>(false);
   const [themeIndex, setThemeIndex] = useState(0);
   const [autoUpdateJson, setAutoUpdateJson] = useState(true);
   const theme = themes[themeIndex];
@@ -39,8 +40,21 @@ const App: React.FC = () => {
         const res = await fetch(configUrl, { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && Array.isArray(data)) {
+        if (cancelled || !data) return;
+        if (Array.isArray(data)) {
           setFields(data as Field[]);
+        } else if (typeof data === "object") {
+          // { fields: Field[], userModeOnly?: boolean }
+          const cfg: any = data;
+          if (Array.isArray(cfg.fields)) {
+            setFields(cfg.fields as Field[]);
+          }
+          if (typeof cfg.userModeOnly === "boolean") {
+            setUserModeOnly(cfg.userModeOnly);
+            if (cfg.userModeOnly) {
+              setMode("user");
+            }
+          }
         }
       } catch {
         // 取得失敗時は無視（手動で作成可能）
@@ -51,6 +65,13 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  // userModeOnly 指定時は常にユーザーモードに固定
+  React.useEffect(() => {
+    if (userModeOnly && mode !== "user") {
+      setMode("user");
+    }
+  }, [userModeOnly, mode]);
 
   // fieldsが変更されたときにJSONを更新
   React.useEffect(() => {
@@ -80,72 +101,76 @@ const App: React.FC = () => {
         transition: "all 0.3s",
       }}
     >
-      {/* モード切替＆テーマ選択 */}
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
-        <div>
-          <button
-            style={{
-              backgroundColor: mode === "admin" ? "#a3c0ff" : theme.primaryColor,
-              color: mode === "admin" ? "#333" : (theme.textColor === "#ddd" ? "#fff" : "white"),
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: 6,
-              cursor: mode === "admin" ? "default" : "pointer",
-              fontWeight: "600",
-              boxShadow: mode === "admin" ? "none" : `0 2px 6px ${theme.primaryColor}66`,
-              transition: "background-color 0.3s",
-            }}
-            onClick={() => setMode("admin")}
-            disabled={mode === "admin"}
-          >
-            管理モード
-          </button>
-          <button
-            style={{
-              backgroundColor: mode === "user" ? "#a3c0ff" : theme.primaryColor,
-              color: mode === "user" ? "#333" : (theme.textColor === "#ddd" ? "#fff" : "white"),
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: 6,
-              cursor: mode === "user" ? "default" : "pointer",
-              fontWeight: "600",
-              boxShadow: mode === "user" ? "none" : `0 2px 6px ${theme.primaryColor}66`,
-              transition: "background-color 0.3s",
-              marginLeft: 12,
-            }}
-            onClick={() => setMode("user")}
-            disabled={mode === "user"}
-          >
-            ユーザーモード
-          </button>
-        </div>
-        {mode === "admin" && (
+      {/* モード切替＆テーマ選択（ユーザモード固定時は非表示） */}
+      {!userModeOnly && (
+        <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
           <div>
-            <label style={{ marginRight: 8, fontWeight: "600" }}>テーマ:</label>
-            <select
-              value={themeIndex}
-              onChange={(e) => setThemeIndex(Number(e.target.value))}
+            <button
               style={{
-                padding: 6,
+                backgroundColor: mode === "admin" ? "#a3c0ff" : theme.primaryColor,
+                color: mode === "admin" ? "#333" : (theme.textColor === "#ddd" ? "#fff" : "white"),
+                border: "none",
+                padding: "8px 16px",
                 borderRadius: 6,
-                border: `1.5px solid ${theme.primaryColor}`,
-                backgroundColor: theme.lightPrimary,
-                color: theme.primaryColor,
+                cursor: mode === "admin" ? "default" : "pointer",
                 fontWeight: "600",
-                cursor: "pointer",
+                boxShadow: mode === "admin" ? "none" : `0 2px 6px ${theme.primaryColor}66`,
+                transition: "background-color 0.3s",
               }}
+              onClick={() => setMode("admin")}
+              disabled={mode === "admin"}
             >
-              {themes.map((t, i) => (
-                <option key={t.name} value={i}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              管理モード
+            </button>
+            <button
+              style={{
+                backgroundColor: mode === "user" ? "#a3c0ff" : theme.primaryColor,
+                color: mode === "user" ? "#333" : (theme.textColor === "#ddd" ? "#fff" : "white"),
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 6,
+                cursor: mode === "user" ? "default" : "pointer",
+                fontWeight: "600",
+                boxShadow: mode === "user" ? "none" : `0 2px 6px ${theme.primaryColor}66`,
+                transition: "background-color 0.3s",
+                marginLeft: 12,
+              }}
+              onClick={() => setMode("user")}
+              disabled={mode === "user"}
+            >
+              ユーザーモード
+            </button>
           </div>
-        )}
-      </div>
+          {mode === "admin" && (
+            <div>
+              <label style={{ marginRight: 8, fontWeight: "600" }}>テーマ:</label>
+              <select
+                value={themeIndex}
+                onChange={(e) => setThemeIndex(Number(e.target.value))}
+                style={{
+                  padding: 6,
+                  borderRadius: 6,
+                  border: `1.5px solid ${theme.primaryColor}`,
+                  backgroundColor: theme.lightPrimary,
+                  color: theme.primaryColor,
+                  fontWeight: "600",
+                  cursor: "pointer",
+                }}
+              >
+                {themes.map((t, i) => (
+                  <option key={t.name} value={i}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
-      {mode === "admin" ? (
+      {userModeOnly ? (
+        <UserMode fields={fields} theme={theme} />
+      ) : mode === "admin" ? (
         <AdminMode
           fields={fields}
           setFields={setFields}
