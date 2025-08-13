@@ -42,6 +42,7 @@ const themes: Theme[] = [
 const App: React.FC = () => {
   const [fields, setFields] = useState<Field[]>([]);
   const [dragging, setDragging] = useState<"text" | "radio" | "checkbox" | null>(null);
+  const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
   const [jsonInput, setJsonInput] = useState("");
   const [mode, setMode] = useState<Mode>("admin");
   const [themeIndex, setThemeIndex] = useState(0);
@@ -73,6 +74,37 @@ const App: React.FC = () => {
 
   const updateValidationRegex = (id: string, regex: string | undefined) => {
     setFields(fields.map(f => f.id === id && f.type === "text" ? { ...f, validationRegex: regex } : f));
+  };
+
+  // フィールドの移動機能
+  const moveField = (fromIndex: number, toIndex: number) => {
+    const newFields = [...fields];
+    const [movedField] = newFields.splice(fromIndex, 1);
+    newFields.splice(toIndex, 0, movedField);
+    setFields(newFields);
+  };
+
+  const handleFieldDragStart = (e: React.DragEvent, fieldId: string) => {
+    setDraggingFieldId(fieldId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleFieldDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleFieldDrop = (e: React.DragEvent, targetFieldId: string) => {
+    e.preventDefault();
+    if (!draggingFieldId || draggingFieldId === targetFieldId) return;
+
+    const fromIndex = fields.findIndex(f => f.id === draggingFieldId);
+    const toIndex = fields.findIndex(f => f.id === targetFieldId);
+    
+    if (fromIndex !== -1 && toIndex !== -1) {
+      moveField(fromIndex, toIndex);
+    }
+    setDraggingFieldId(null);
   };
 
   const saveJSON = () => {
@@ -254,14 +286,81 @@ const App: React.FC = () => {
             {fields.map((field) => (
               <div
                 key={field.id}
+                draggable
+                onDragStart={(e) => handleFieldDragStart(e, field.id)}
+                onDragOver={handleFieldDragOver}
+                onDrop={(e) => handleFieldDrop(e, field.id)}
                 style={{
                   border: `1px solid ${theme.primaryColor}44`,
                   borderRadius: 10,
                   padding: 16,
                   marginBottom: 16,
                   backgroundColor: theme.name === "ダーク" ? "#22303f" : "white",
+                  cursor: "grab",
+                  transition: "all 0.2s ease",
+                  opacity: draggingFieldId === field.id ? 0.5 : 1,
+                  transform: draggingFieldId === field.id ? "scale(0.98)" : "scale(1)",
+                  boxShadow: draggingFieldId === field.id 
+                    ? `0 4px 12px ${theme.primaryColor}44` 
+                    : "0 2px 8px rgba(0,0,0,0.1)",
+                }}
+                onMouseEnter={(e) => {
+                  if (draggingFieldId !== field.id) {
+                    e.currentTarget.style.transform = "scale(1.02)";
+                    e.currentTarget.style.boxShadow = `0 4px 12px ${theme.primaryColor}44`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (draggingFieldId !== field.id) {
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
+                  }
                 }}
               >
+                {/* ドラッグハンドル */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    marginBottom: 12,
+                    paddingBottom: 8,
+                    borderBottom: `1px solid ${theme.primaryColor}22`,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: theme.primaryColor,
+                      borderRadius: 4,
+                      marginRight: 8,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "grab",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        backgroundColor: "white",
+                        borderRadius: 1,
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: theme.primaryColor,
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {field.type === "text" ? "テキスト" : field.type === "radio" ? "ラジオ" : "チェック"}
+                  </span>
+                </div>
+
                 <input
                   type="text"
                   value={field.label}
