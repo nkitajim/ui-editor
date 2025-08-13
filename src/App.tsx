@@ -80,8 +80,12 @@ const App: React.FC = () => {
 
   const updateDefaultValue = (id: string, defaultValue: string) => {
     setFields(fields.map(f => {
-      if (f.id === id && f.type === "text") {
-        return { ...f, defaultValue: defaultValue || undefined };
+      if (f.id === id) {
+        if (f.type === "text") {
+          return { ...f, defaultValue: defaultValue || undefined };
+        } else if (f.type === "radio") {
+          return { ...f, defaultValue: defaultValue || undefined };
+        }
       }
       return f;
     }));
@@ -475,6 +479,21 @@ const App: React.FC = () => {
                 {/* ラジオボタン */}
                 {field.type === "radio" && (
                   <>
+                    <input
+                      type="text"
+                      placeholder="デフォルト値（選択肢のいずれかを入力）"
+                      value={field.defaultValue || ""}
+                      onChange={(e) => updateDefaultValue(field.id, e.target.value)}
+                      style={{
+                        ...inputStyle,
+                        ...(focusedId === field.id + "-default" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
+                        marginBottom: 12,
+                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
+                        color: theme.textColor,
+                      }}
+                      onFocus={() => setFocusedId(field.id + "-default")}
+                      onBlur={() => setFocusedId(null)}
+                    />
                     {field.options.map((opt, idx) => (
                       <div key={idx} style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
                         <input type="radio" disabled checked={field.defaultValue === opt} />
@@ -494,6 +513,35 @@ const App: React.FC = () => {
                             color: theme.textColor,
                           }}
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOpts = field.options.filter((_, optionIdx) => optionIdx !== idx);
+                            updateOptions(field.id, newOpts);
+                            // 削除された選択肢がデフォルト値だった場合、デフォルト値をクリア
+                            if (field.defaultValue === opt) {
+                              updateDefaultValue(field.id, "");
+                            }
+                          }}
+                          style={{
+                            marginLeft: 8,
+                            backgroundColor: "#ff4d4f",
+                            color: "white",
+                            border: "none",
+                            borderRadius: 4,
+                            width: 24,
+                            height: 24,
+                            cursor: "pointer",
+                            fontSize: 12,
+                            fontWeight: "bold",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          title="選択肢を削除"
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
                     <button
@@ -534,6 +582,37 @@ const App: React.FC = () => {
                               color: theme.textColor,
                             }}
                           />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newOpts = field.options.filter((_, optionIdx) => optionIdx !== idx);
+                              updateOptions(field.id, newOpts);
+                              // 削除された選択肢がデフォルト値に含まれていた場合、デフォルト値から削除
+                              if (Array.isArray(field.defaultValue) && field.defaultValue.includes(opt)) {
+                                const newDefaults = field.defaultValue.filter(defaultOpt => defaultOpt !== opt);
+                                const newDefaultsString = newDefaults.join(",");
+                                updateDefaultValue(field.id, newDefaultsString);
+                              }
+                            }}
+                            style={{
+                              marginLeft: 8,
+                              backgroundColor: "#ff4d4f",
+                              color: "white",
+                              border: "none",
+                              borderRadius: 4,
+                              width: 24,
+                              height: 24,
+                              cursor: "pointer",
+                              fontSize: 12,
+                              fontWeight: "bold",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                            title="選択肢を削除"
+                          >
+                            ×
+                          </button>
                         </div>
                       );
                     })}
@@ -631,7 +710,8 @@ const App: React.FC = () => {
                   output[field.label] = val;
                 } else if (field.type === "radio") {
                   const formData = new FormData(e.currentTarget);
-                  output[field.label] = formData.get(field.id);
+                  const selectedValue = formData.get(field.id);
+                  output[field.label] = selectedValue || field.defaultValue || "";
                 } else if (field.type === "checkbox") {
                   const formData = new FormData(e.currentTarget);
                   const values: string[] = [];
