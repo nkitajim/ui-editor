@@ -371,40 +371,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                             {/* ラジオボタン */}
                 {field.type === "radio" && (
                   <>
-                    <textarea
-                      value={field.description || ""}
-                      onChange={(e) => updateDescription(field.id, e.target.value)}
-                      placeholder="説明文（任意）&#10;リンク: [テキスト](URL)（例: [詳細はこちら](https://example.com)）&#10;太字: **重要**（例）&#10;小さな文字: ^^補足^^（例）"
-                      style={{
-                        ...styles.inputStyle,
-                        ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                        marginBottom: 8,
-                        minHeight: 80,
-                        resize: "vertical",
-                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                        color: theme.textColor,
-                      }}
-                      onFocus={() => setFocusedId(field.id + "-description")}
-                      onBlur={() => setFocusedId(null)}
-                    />
-                    {field.description && (
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: theme.textColor === "#ddd" ? "#bbb" : "#666",
-                          marginBottom: 12,
-                          padding: 8,
-                          backgroundColor: theme.name === "ダーク" ? "#34495e" : "#f8f9fa",
-                          borderRadius: 4,
-                          border: `1px solid ${theme.primaryColor}33`,
-                        }}
-                      >
-                        <strong>プレビュー:</strong>{' '}
-                <span
-                  dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
-                />
-                      </div>
-                    )}
+                    {/* 重複する説明文UIは上部に集約済み */}
                     <input
                       type="text"
                       placeholder="デフォルト値（選択肢のいずれかを入力）"
@@ -482,40 +449,7 @@ export const AdminMode: React.FC<AdminModeProps> = ({
                             {/* チェックボックス */}
                 {field.type === "checkbox" && (
                   <>
-                    <textarea
-                      value={field.description || ""}
-                      onChange={(e) => updateDescription(field.id, e.target.value)}
-                      placeholder="説明文（任意）&#10;リンク: [テキスト](URL)（例: [詳細はこちら](https://example.com)）&#10;太字: **重要**（例）&#10;小さな文字: ^^補足^^（例）"
-                      style={{
-                        ...styles.inputStyle,
-                        ...(focusedId === field.id + "-description" ? { borderColor: theme.primaryColor, boxShadow: `0 0 6px ${theme.primaryColor}aa` } : {}),
-                        marginBottom: 8,
-                        minHeight: 80,
-                        resize: "vertical",
-                        backgroundColor: theme.name === "ダーク" ? "#2c3e50" : undefined,
-                        color: theme.textColor,
-                      }}
-                      onFocus={() => setFocusedId(field.id + "-description")}
-                      onBlur={() => setFocusedId(null)}
-                    />
-                    {field.description && (
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: theme.textColor === "#ddd" ? "#bbb" : "#666",
-                          marginBottom: 12,
-                          padding: 8,
-                          backgroundColor: theme.name === "ダーク" ? "#34495e" : "#f8f9fa",
-                          borderRadius: 4,
-                          border: `1px solid ${theme.primaryColor}33`,
-                        }}
-                      >
-                        <strong>プレビュー:</strong>{' '}
-                        <span
-                          dangerouslySetInnerHTML={{ __html: parseDescriptionWithLinks(field.description) }}
-                        />
-                      </div>
-                    )}
+                    {/* 重複する説明文UIは上部に集約済み */}
                     <input
                       type="text"
                       placeholder="デフォルト値（カンマ区切りで選択肢を入力）"
