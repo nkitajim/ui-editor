@@ -15,6 +15,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const styles = createStyles(theme);
 
   // バリデーション関数
@@ -143,8 +144,16 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
             setCheckboxValues({});
             setValidationErrors({});
 
+            // 保存されたデータリストを更新
+            setRefreshTrigger(prev => prev + 1);
+
             console.log('保存されたデータ:', output);
             console.log('保存結果:', result);
+
+            // 成功メッセージを3秒後に自動的に消す
+            setTimeout(() => {
+              setSubmitMessage(null);
+            }, 3000);
 
           } catch (error) {
             console.error('送信エラー:', error);
@@ -152,6 +161,11 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
               type: 'error', 
               text: 'データの保存に失敗しました。サーバーが起動しているか確認してください。' 
             });
+
+            // エラーメッセージを5秒後に自動的に消す
+            setTimeout(() => {
+              setSubmitMessage(null);
+            }, 5000);
           } finally {
             setIsSubmitting(false);
           }
@@ -301,7 +315,7 @@ export const UserMode: React.FC<UserModeProps> = ({ fields, theme }) => {
         </button>
       </form>
       
-      <SubmissionsList theme={theme} />
+      <SubmissionsList theme={theme} refreshTrigger={refreshTrigger} />
     </div>
   );
 };
